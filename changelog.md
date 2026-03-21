@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[012][0350510] feat(feeds): build unified feed aggregator merging all data sources per region
+
 [011][2a173a5] feat(feeds): add GDELT geopolitical connector with supply-chain event filtering
 
 [010][28eaa54] feat(feeds): implement carrier API connector with ETA normalization and delay tagging
