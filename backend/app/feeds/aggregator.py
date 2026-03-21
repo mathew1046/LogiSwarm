@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -30,6 +31,14 @@ SEVERITY_ORDER = {
     "LOW": 1,
 }
 
+CONNECTOR_DEFAULT_POLL_INTERVALS = {
+    "ais": 300,
+    "weather": 900,
+    "port_simulator": 300,
+    "carrier": 300,
+    "gdelt": 300,
+}
+
 
 class Event(BaseModel):
     """Unified event format consumed by geo-agents during perception."""
@@ -45,6 +54,19 @@ class Event(BaseModel):
     raw: dict
 
 
+class FeedHealth(BaseModel):
+    """Health snapshot for a single feed connector."""
+
+    model_config = ConfigDict(extra="allow")
+
+    connector: str
+    status: str
+    last_successful_fetch: datetime | None
+    last_latency_ms: float | None
+    event_count_last_hour: int
+    poll_interval_seconds: int
+
+
 class FeedAggregator:
     """Aggregate heterogeneous connector payloads into a single normalized event stream."""
 
@@ -54,6 +76,12 @@ class FeedAggregator:
         self.port_simulator = PortSensorSimulator()
         self.carrier_connector = CarrierConnector()
         self.gdelt_connector = GdeltConnector()
+        self.last_successful_fetch_by_connector: dict[str, datetime | None] = {
+            connector: None for connector in CONNECTOR_DEFAULT_POLL_INTERVALS
+        }
+        self.last_latency_ms_by_connector: dict[str, float | None] = {
+            connector: None for connector in CONNECTOR_DEFAULT_POLL_INTERVALS
+        }
 
     async def get_region_events(
         self,
@@ -87,6 +115,62 @@ class FeedAggregator:
                 -event.timestamp.timestamp(),
             ),
         )
+
+    async def get_connectors_health(
+        self,
+        region_id: str,
+        lookback_minutes: int = 60,
+    ) -> list[FeedHealth]:
+        """Return per-connector feed health using latency and recent fetch activity."""
+        bbox = self._resolve_bbox(region_id)
+
+        connector_calls = [
+            ("ais", self._from_ais(bbox=bbox)),
+            ("weather", self._from_weather(region_id=region_id, bbox=bbox)),
+            ("port_simulator", self._from_port(region_id=region_id, bbox=bbox)),
+            ("carrier", self._from_carrier(region_id=region_id, bbox=bbox)),
+            ("gdelt", self._from_gdelt(region_id=region_id, bbox=bbox)),
+        ]
+
+        health: list[FeedHealth] = []
+        cutoff = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
+
+        for connector, awaitable in connector_calls:
+            started = time.perf_counter()
+            successful = False
+            events: list[Event] = []
+            try:
+                events = await awaitable
+                successful = True
+            except Exception:
+                successful = False
+
+            latency_ms = round((time.perf_counter() - started) * 1000, 2)
+            self.last_latency_ms_by_connector[connector] = latency_ms
+
+            if successful:
+                self.last_successful_fetch_by_connector[connector] = datetime.now(UTC)
+
+            last_successful_fetch = self.last_successful_fetch_by_connector[connector]
+            poll_interval_seconds = self._poll_interval_seconds(connector)
+            status = self._connector_status(
+                last_successful_fetch=last_successful_fetch,
+                poll_interval_seconds=poll_interval_seconds,
+            )
+
+            event_count_last_hour = len([event for event in events if event.timestamp >= cutoff])
+            health.append(
+                FeedHealth(
+                    connector=connector,
+                    status=status,
+                    last_successful_fetch=last_successful_fetch,
+                    last_latency_ms=latency_ms,
+                    event_count_last_hour=event_count_last_hour,
+                    poll_interval_seconds=poll_interval_seconds,
+                )
+            )
+
+        return health
 
     async def _from_ais(self, bbox: tuple[float, float, float, float]) -> list[Event]:
         snapshots = await self.ais_connector.fetch_positions(bbox=bbox)
@@ -244,6 +328,23 @@ class FeedAggregator:
     @staticmethod
     def _resolve_bbox(region_id: str) -> tuple[float, float, float, float]:
         return DEFAULT_BBOX_BY_REGION.get(region_id, (-180.0, -85.0, 180.0, 85.0))
+
+    def _poll_interval_seconds(self, connector: str) -> int:
+        if connector == "ais":
+            return int(self.ais_connector.poll_interval_seconds)
+        if connector == "weather":
+            return int(self.weather_connector.cache_ttl_seconds)
+        return CONNECTOR_DEFAULT_POLL_INTERVALS[connector]
+
+    @staticmethod
+    def _connector_status(last_successful_fetch: datetime | None, poll_interval_seconds: int) -> str:
+        if last_successful_fetch is None:
+            return "DEGRADED"
+
+        silent_seconds = (datetime.now(UTC) - last_successful_fetch).total_seconds()
+        if silent_seconds > (2 * poll_interval_seconds):
+            return "DEGRADED"
+        return "HEALTHY"
 
     @staticmethod
     def _bbox_center(bbox: tuple[float, float, float, float]) -> tuple[float, float]:

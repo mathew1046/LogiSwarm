@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from app.api import projects_router
+from app.api import feeds_router, projects_router
 from app.bus.connection import close_redis_pool, init_redis_pool
 
 
@@ -95,6 +95,7 @@ configure_logging()
 app = FastAPI(title="LogiSwarm Backend", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, **_cors_config())
 app.include_router(projects_router)
+app.include_router(feeds_router)
 
 
 @app.get("/health")
