@@ -1,5 +1,5 @@
 from app.db.base import Base
-from app.db.models import AgentEpisode, DisruptionEvent, GeoRegion, RouteRecommendation, ShipmentRecord
+from app.db.models import AgentEpisode, DisruptionEvent, GeoRegion, Project, RouteRecommendation, ShipmentRecord
 
 __all__ = [
     "Base",
@@ -8,4 +8,5 @@ __all__ = [
     "DisruptionEvent",
     "RouteRecommendation",
     "AgentEpisode",
+    "Project",
 ]
