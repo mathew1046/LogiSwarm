@@ -25,12 +25,12 @@
 
 ## Implementation Status
 
-**Overall:** 7/100 tasks complete · Phase 1 in progress
+**Overall:** 8/100 tasks complete · Phase 1 in progress
 
 | Phase | Tasks | Status | Complete |
 |---|---|---|---|
 | 0 — Foundation | 001–006 | ✅ Complete | 6/6 |
-| 1 — Data Ingestion | 007–013 | 🔶 In progress | 1/7 |
+| 1 — Data Ingestion | 007–013 | 🔶 In progress | 2/7 |
 | 2 — Geo-Agent Core | 014–025 | 🔲 Not started | 0/12 |
 | 3 — Orchestration | 026–031 | 🔲 Not started | 0/6 |
 | 4 — Action Layer | 032–036 | 🔲 Not started | 0/5 |
@@ -39,6 +39,6 @@
 | 7 — Polish | 059–072 | 🔲 Not started | 0/14 |
 | 8 — Advanced | 073–100 | 🔲 Not started | 0/28 |
 
-**Last completed task:** Task 007 — AIS Feed Connector (Vessel Tracking)  
-**Next task:** Task 008 — Weather Feed Connector (NOAA/ERA5)  
+**Last completed task:** Task 008 — Weather Feed Connector (NOAA/ERA5)  
+**Next task:** Task 009 — Port Sensor Simulator (Dev Mock)  
 **Blockers:** None
