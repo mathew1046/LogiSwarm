@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[007][52c49ea] feat(feeds): implement AIS vessel tracking connector with TimescaleDB storage
+
 [006][0afb704] feat(api): introduce project_id for stateful session context management
 
 [005][9c63ffe] feat(bus): implement Redis pub/sub message bus for inter-agent communication
