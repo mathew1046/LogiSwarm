@@ -8,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.bus.connection import close_redis_pool, init_redis_pool
+
 
 class MaxTokensWarningFilter(logging.Filter):
     """Suppress repetitive max-tokens warnings from provider/client loggers."""
@@ -78,8 +80,12 @@ def _log_registered_routes(app: FastAPI) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.bind(event="startup").info("Starting backend service")
+    await init_redis_pool()
+    logger.bind(event="startup").info("Redis connection pool initialized")
     _log_registered_routes(app)
     yield
+    await close_redis_pool()
+    logger.bind(event="shutdown").info("Redis connection pool closed")
     logger.bind(event="shutdown").info("Shutting down backend service")
 
 
