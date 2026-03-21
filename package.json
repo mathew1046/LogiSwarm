@@ -1,0 +1,10 @@
+{
+  "name": "logiswarm",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "setup:backend": "cd backend && uv sync",
+    "setup:all": "npm run setup:backend && npm --prefix frontend install"
+  }
+}

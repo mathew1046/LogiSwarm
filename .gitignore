@@ -1,0 +1,241 @@
+# ============================================================
+# LogiSwarm .gitignore
+# Stack: Python · FastAPI · Vue 3 · Node · Docker · VS Code
+# ============================================================
+
+# ------------------------------------------------------------
+# SECRETS & ENV
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.p12
+secrets/
+
+# ------------------------------------------------------------
+# PYTHON
+# ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+MANIFEST
+.Python
+.vscode/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Package managers
+pip-log.txt
+pip-delete-this-directory.txt
+.github/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+coverage/
+htmlcov/
+*.cover
+.hypothesis/
+nosetests.xml
+test-results/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# Profiling
+*.prof
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# uv
+.uv/
+uv.lock
+
+# ------------------------------------------------------------
+# NODE / FRONTEND
+# ------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# Build output
+frontend/dist/
+frontend/dist-ssr/
+frontend/.output/
+frontend/build/
+
+# Vite
+*.local
+.vite/
+
+# Testing
+frontend/coverage/
+frontend/.vitest/
+
+# ------------------------------------------------------------
+# DATABASES & DATA
+# ------------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.sql.gz
+*.dump
+*.psql
+
+# TimescaleDB / Postgres local data
+postgres-data/
+pgdata/
+data/
+
+# Redis
+dump.rdb
+redis-data/
+
+# ------------------------------------------------------------
+# DOCKER
+# ------------------------------------------------------------
+.docker/
+docker-data/
+volumes/
+
+# ------------------------------------------------------------
+# LOGS
+# ------------------------------------------------------------
+logs/
+*.log
+*.log.*
+log/
+backend/logs/
+frontend/logs/
+
+# ------------------------------------------------------------
+# OS
+# ------------------------------------------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.nfs*
+
+# ------------------------------------------------------------
+# EDITORS & IDEs
+# ------------------------------------------------------------
+
+# VS Code (keep .vscode/extensions.json and settings if shared)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim / Neovim
+*.swp
+*.swo
+*.swn
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+
+# ------------------------------------------------------------
+# TESTING & CI
+# ------------------------------------------------------------
+.locust/
+locust-results/
+test-results/
+allure-results/
+allure-report/
+junit.xml
+report.xml
+
+# ------------------------------------------------------------
+# MISC / TEMP
+# ------------------------------------------------------------
+
+# Scratch files — these should never exist per instructions.md
+debug.py
+temp.py
+test_quick.py
+scratch.py
+tmp/
+temp/
+.tmp/
+
+# Uploads (user data, not source)
+backend/uploads/
+uploads/
+
+# Generated reports (runtime artifacts)
+backend/reports/generated/
+
+# Model weights (if ever used locally)
+*.bin
+*.gguf
+*.onnx
+*.pt
+*.pth
+*.safetensors
+models/
+
+# Certificates (auto-generated)
+certs/
+ssl/
