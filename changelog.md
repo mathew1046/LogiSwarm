@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[006][0afb704] feat(api): introduce project_id for stateful session context management
+
 [005][9c63ffe] feat(bus): implement Redis pub/sub message bus for inter-agent communication
 
 [004][7cdbaf6] feat(db): define SQLAlchemy models and Alembic migrations with TimescaleDB hypertable
