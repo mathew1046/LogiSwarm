@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[009][e4a25da] feat(feeds): add port sensor mock simulator with configurable anomaly injection
+
 [008][f6afc74] feat(feeds): add weather connector using Open-Meteo with severity tagging
 
 [007][52c49ea] feat(feeds): implement AIS vessel tracking connector with TimescaleDB storage
