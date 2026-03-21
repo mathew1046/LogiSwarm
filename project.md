@@ -25,11 +25,11 @@
 
 ## Implementation Status
 
-**Overall:** 2/100 tasks complete · Phase 0 in progress
+**Overall:** 3/100 tasks complete · Phase 0 in progress
 
 | Phase | Tasks | Status | Complete |
 |---|---|---|---|
-| 0 — Foundation | 001–006 | 🔶 In progress | 2/6 |
+| 0 — Foundation | 001–006 | 🔶 In progress | 3/6 |
 | 1 — Data Ingestion | 007–013 | 🔲 Not started | 0/7 |
 | 2 — Geo-Agent Core | 014–025 | 🔲 Not started | 0/12 |
 | 3 — Orchestration | 026–031 | 🔲 Not started | 0/6 |
@@ -39,6 +39,6 @@
 | 7 — Polish | 059–072 | 🔲 Not started | 0/14 |
 | 8 — Advanced | 073–100 | 🔲 Not started | 0/28 |
 
-**Last completed task:** Task 002 — Docker Compose for Local Dev  
-**Next task:** Task 003 — Backend Base: FastAPI App + Logging  
+**Last completed task:** Task 003 — Backend Base: FastAPI App + Logging  
+**Next task:** Task 004 — Database Models & Migrations (Alembic)  
 **Blockers:** None

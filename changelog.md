@@ -1,7 +1,7 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
-<!-- ENTRIES GO HERE -->
+[003][d6767d0] feat(backend): initialize FastAPI app with structured logging and health endpoint
 
 [002][89ba56e] feat(docker): add docker-compose with TimescaleDB, Redis, backend and frontend services
 
