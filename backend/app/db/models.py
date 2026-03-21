@@ -113,3 +113,17 @@ class Project(Base):
         server_default=func.now(),
     )
     config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class VesselPosition(Base):
+    __tablename__ = "vessel_positions"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    vessel_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lon: Mapped[float] = mapped_column(Float, nullable=False)
+    speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    heading: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(64), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    raw: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
