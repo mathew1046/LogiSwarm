@@ -1,6 +1,14 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[054][2b8d27f] feat(frontend): add in-app alert notification center with read/unread state
+
+[050][2b8d27f] feat(frontend): add real-time disruption event feed with filtering and virtualization
+
+[049][74ccc4f] feat(frontend): implement world risk map with Leaflet.js and real-time overlay
+
+[048][ed58811] feat(frontend): add agent status panel with live SSE-driven risk level cards
+
 [047][437423a] feat(frontend): implement main view with step-based workflow indicator
 
 [046][ecae1f5] feat(frontend): add multi-step project creation wizard with region and shipment config
