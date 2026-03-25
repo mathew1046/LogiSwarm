@@ -1,6 +1,18 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[026][91b3886] feat(orchestrator): implement swarm orchestrator with cross-region signal aggregation
+
+[025][d443a78] feat(agents): implement inter-agent neighbor broadcast for cross-region signal propagation
+
+[024][e41120b] feat(agents): add dynamic system prompt builder with live context injection
+
+[023][bddecb7] feat(agents): implement agent registry and manager with lifecycle control endpoints
+
+[022][ba56233] feat(agents): add China/East Asia geo-agent covering Shanghai-Ningbo-Busan cluster
+
+[021][27cc75d] feat(agents): add North America geo-agent with intermodal and port of LA focus
+
 [020][ceb8e9d] feat(agents): add Gulf/Suez geo-agent with elevated risk sensitivity and geopolitical weighting
 
 [019][35e2562] feat(agents): add Europe geo-agent covering Rotterdam-Hamburg-Antwerp corridor
