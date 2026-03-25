@@ -5,6 +5,7 @@ from app.db.models import (
     DisruptionEvent,
     GeoRegion,
     Project,
+    Route,
     RouteRecommendation,
     ShipmentRecord,
     VesselPosition,
@@ -20,4 +21,5 @@ __all__ = [
     "Project",
     "VesselPosition",
     "DecisionLog",
+    "Route",
 ]

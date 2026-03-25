@@ -174,3 +174,46 @@ class DecisionLog(Base):
         server_default=func.now(),
         index=True,
     )
+
+
+class Route(Base):
+    __tablename__ = "routes"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    route_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    origin_region: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    destination_region: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
+    )
+    path: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    cost: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    transit_hours: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    reliability: Mapped[float] = mapped_column(Float, nullable=False, default=0.9)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    disrupted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    disruption_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    region_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    decision_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    input_events: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    output_action: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    human_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    outcome: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
