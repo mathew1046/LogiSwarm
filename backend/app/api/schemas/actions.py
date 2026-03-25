@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from app.actions.slack_notifier import SlackAlertPayload, SlackNotifyResult
 from app.actions.tms_webhook import TMSDispatchResult, TMSWebhookPayload
 
 
@@ -25,3 +26,26 @@ class TMSDispatchResponse(BaseModel):
     """Typed response payload for TMS dispatch results."""
 
     result: TMSDispatchResult
+
+
+class SlackDispatchRequest(BaseModel):
+    """Request body for dispatching disruption alerts to Slack."""
+
+    payload: SlackAlertPayload
+
+
+class SlackDispatchResponse(BaseModel):
+    """Typed response payload for Slack alert delivery results."""
+
+    result: SlackNotifyResult
+
+
+class SlackAcceptResponse(BaseModel):
+    """Typed webhook action payload for accepted Slack recommendations."""
+
+    accepted: bool
+    action_id: str | None = None
+    user_id: str | None = None
+    project_id: str | None = None
+    region_id: str | None = None
+    recommendation: str | None = None
