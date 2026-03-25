@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents.base_agent import GeoAgent
 from app.agents.llm_core import ClaudeReasoningCore
@@ -35,10 +35,46 @@ class Envelope(BaseModel):
     meta: dict[str, Any] | None = None
 
 
+class AgentConfigResponse(BaseModel):
+    """Agent configuration parameters."""
+
+    region_id: str
+    region_name: str
+    poll_interval_seconds: int
+    confidence_threshold: float
+    auto_act_enabled: bool
+    broadcast_to_neighbors: bool
+    neighbors: list[str]
+
+
+class AgentConfigUpdate(BaseModel):
+    """Request body for updating agent configuration."""
+
+    poll_interval_seconds: int | None = Field(default=None, ge=30, le=3600)
+    confidence_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    auto_act_enabled: bool | None = None
+    broadcast_to_neighbors: bool | None = None
+
+
+class AgentConfigEnvelope(BaseModel):
+    """API envelope for agent config responses."""
+
+    model_config = ConfigDict(extra="allow")
+
+    data: AgentConfigResponse
+    error: str | None = None
+    meta: dict[str, Any] | None = None
+
+
+_agent_configs: dict[str, dict[str, Any]] = {}
+
+
 class AgentManager:
     """Registry and lifecycle manager for all configured geo-agents."""
 
-    def __init__(self, llm_client: object | None = None, zep_client: object | None = None) -> None:
+    def __init__(
+        self, llm_client: object | None = None, zep_client: object | None = None
+    ) -> None:
         self.llm_client = llm_client or ClaudeReasoningCore()
         self.zep_client = zep_client or ZepEpisodicMemory()
         self.agents: dict[str, GeoAgent] = {}
@@ -74,6 +110,60 @@ class AgentManager:
         """Return detailed status for one regional agent."""
         return self._status_payload(self.get_agent(region_id))
 
+    def get_agent_config(self, region_id: str) -> AgentConfigResponse:
+        """Return current configuration for one regional agent."""
+        agent = self.get_agent(region_id)
+        stored_config = _agent_configs.get(region_id, {})
+        neighbors = [n for n in NEIGHBOR_MAP.get(region_id, [])]
+
+        return AgentConfigResponse(
+            region_id=agent.region_id,
+            region_name=agent.region_name,
+            poll_interval_seconds=stored_config.get(
+                "poll_interval_seconds", agent.poll_interval_seconds
+            ),
+            confidence_threshold=stored_config.get("confidence_threshold", 0.75),
+            auto_act_enabled=stored_config.get("auto_act_enabled", True),
+            broadcast_to_neighbors=stored_config.get("broadcast_to_neighbors", True),
+            neighbors=neighbors,
+        )
+
+    def update_agent_config(
+        self, region_id: str, updates: AgentConfigUpdate
+    ) -> AgentConfigResponse:
+        """Update configuration for one regional agent and hot-reload."""
+        agent = self.get_agent(region_id)
+
+        if region_id not in _agent_configs:
+            _agent_configs[region_id] = {
+                "poll_interval_seconds": agent.poll_interval_seconds,
+                "confidence_threshold": 0.75,
+                "auto_act_enabled": True,
+                "broadcast_to_neighbors": True,
+            }
+
+        config = _agent_configs[region_id]
+
+        if updates.poll_interval_seconds is not None:
+            config["poll_interval_seconds"] = updates.poll_interval_seconds
+            agent.poll_interval_seconds = updates.poll_interval_seconds
+
+        if updates.confidence_threshold is not None:
+            config["confidence_threshold"] = updates.confidence_threshold
+
+        if updates.auto_act_enabled is not None:
+            config["auto_act_enabled"] = updates.auto_act_enabled
+
+        if updates.broadcast_to_neighbors is not None:
+            config["broadcast_to_neighbors"] = updates.broadcast_to_neighbors
+            if updates.broadcast_to_neighbors:
+                neighbors = NEIGHBOR_MAP.get(region_id, [])
+                agent.set_neighbors(neighbors)
+            else:
+                agent.set_neighbors([])
+
+        return self.get_agent_config(region_id)
+
     async def force_assess(self, region_id: str) -> dict[str, Any]:
         """Trigger an immediate perceive→reason→act cycle for one agent."""
         agent = self.get_agent(region_id)
@@ -86,9 +176,15 @@ class AgentManager:
 
     def _instantiate_agents(self) -> None:
         self.agents = {
-            SEAsiaGeoAgent.REGION_ID: SEAsiaGeoAgent(llm_client=self.llm_client, zep_client=self.zep_client),
-            EuropeGeoAgent.REGION_ID: EuropeGeoAgent(llm_client=self.llm_client, zep_client=self.zep_client),
-            GulfSuezGeoAgent.REGION_ID: GulfSuezGeoAgent(llm_client=self.llm_client, zep_client=self.zep_client),
+            SEAsiaGeoAgent.REGION_ID: SEAsiaGeoAgent(
+                llm_client=self.llm_client, zep_client=self.zep_client
+            ),
+            EuropeGeoAgent.REGION_ID: EuropeGeoAgent(
+                llm_client=self.llm_client, zep_client=self.zep_client
+            ),
+            GulfSuezGeoAgent.REGION_ID: GulfSuezGeoAgent(
+                llm_client=self.llm_client, zep_client=self.zep_client
+            ),
             NorthAmericaGeoAgent.REGION_ID: NorthAmericaGeoAgent(
                 llm_client=self.llm_client,
                 zep_client=self.zep_client,
@@ -105,7 +201,9 @@ class AgentManager:
             "region_id": agent.region_id,
             "region_name": agent.region_name,
             "running": bool(agent._task and not agent._task.done()),
-            "last_cycle_at": agent.last_cycle_at.isoformat() if agent.last_cycle_at else None,
+            "last_cycle_at": agent.last_cycle_at.isoformat()
+            if agent.last_cycle_at
+            else None,
             "last_assessment": agent.last_decision,
         }
 
@@ -116,7 +214,11 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 @router.get("", response_model=Envelope)
 async def list_agents() -> Envelope:
-    return Envelope(data=agent_manager.list_agents(), error=None, meta={"total": len(agent_manager.agents)})
+    return Envelope(
+        data=agent_manager.list_agents(),
+        error=None,
+        meta={"total": len(agent_manager.agents)},
+    )
 
 
 @router.get("/{region_id}/status", response_model=Envelope)
@@ -124,8 +226,36 @@ async def get_agent_status(region_id: str) -> Envelope:
     try:
         payload = agent_manager.get_agent_status(region_id)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Agent '{region_id}' not found") from None
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
     return Envelope(data=payload, error=None, meta=None)
+
+
+@router.get("/{region_id}/config", response_model=AgentConfigEnvelope)
+async def get_agent_config(region_id: str) -> AgentConfigEnvelope:
+    """Get current agent configuration thresholds, poll intervals, and settings."""
+    try:
+        config = agent_manager.get_agent_config(region_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
+    return AgentConfigEnvelope(data=config, error=None, meta=None)
+
+
+@router.put("/{region_id}/config", response_model=AgentConfigEnvelope)
+async def update_agent_config(
+    region_id: str, payload: AgentConfigUpdate
+) -> AgentConfigEnvelope:
+    """Update agent configuration and hot-reload agent on next cycle."""
+    try:
+        config = agent_manager.update_agent_config(region_id, payload)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
+    return AgentConfigEnvelope(data=config, error=None, meta={"updated": True})
 
 
 @router.post("/{region_id}/force-assess", response_model=Envelope)
@@ -133,5 +263,7 @@ async def force_assess(region_id: str) -> Envelope:
     try:
         payload = await agent_manager.force_assess(region_id)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Agent '{region_id}' not found") from None
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
     return Envelope(data=payload, error=None, meta=None)
