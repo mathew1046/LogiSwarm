@@ -1,6 +1,10 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[047][437423a] feat(frontend): implement main view with step-based workflow indicator
+
+[046][ecae1f5] feat(frontend): add multi-step project creation wizard with region and shipment config
+
 [045][f788037] feat(frontend): build home page with hero, feature cards, and recent projects list
 
 [044][6ca15f2] feat(frontend): initialize Vue 3 app with Vue Router, Pinia, and global layout
