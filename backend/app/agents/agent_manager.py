@@ -16,6 +16,15 @@ from app.agents.regions.north_america_agent import NorthAmericaGeoAgent
 from app.agents.regions.se_asia_agent import SEAsiaGeoAgent
 
 
+NEIGHBOR_MAP: dict[str, list[str]] = {
+    "se_asia": ["gulf_suez", "china_ea"],
+    "europe": ["gulf_suez", "north_america"],
+    "gulf_suez": ["se_asia", "europe"],
+    "north_america": ["europe"],
+    "china_ea": ["se_asia"],
+}
+
+
 class Envelope(BaseModel):
     """Standard API envelope for agent manager responses."""
 
@@ -38,6 +47,9 @@ class AgentManager:
         """Instantiate and start all core Tier-1 geo-agents."""
         if not self.agents:
             self._instantiate_agents()
+
+        for region_id, neighbors in NEIGHBOR_MAP.items():
+            self.agents[region_id].set_neighbors(neighbors)
 
         for agent in self.agents.values():
             await agent.start()

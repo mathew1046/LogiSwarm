@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+from asyncio import Task
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from typing import Any
+from uuid import uuid4
 
 from loguru import logger
 
 from app.agents.prompt_builder import AgentPromptBuilder
-from app.bus.channels import alert_channel
+from app.bus.channels import alert_channel, broadcast_channel
+from app.bus.connection import get_redis_client
 from app.bus.publisher import publish
+from app.bus.subscriber import subscribe
 from app.feeds.aggregator import Event, FeedAggregator
 
 if TYPE_CHECKING:
@@ -49,11 +53,14 @@ class GeoAgent(ABC):
         self.prompt_builder = prompt_builder or AgentPromptBuilder()
 
         self._task: asyncio.Task[None] | None = None
+        self._broadcast_listener_task: Task[None] | None = None
         self._stop_event = asyncio.Event()
 
         self.last_events: list[Event] = []
         self.last_decision: Decision | None = None
         self.last_cycle_at: datetime | None = None
+        self.neighbor_region_ids: list[str] = []
+        self._incoming_neighbor_signals: list[dict[str, Any]] = []
 
     @abstractmethod
     def get_system_prompt(self) -> str:
@@ -65,6 +72,7 @@ class GeoAgent(ABC):
             region_id=self.region_id,
             lookback_minutes=lookback_minutes,
         )
+        events.extend(self._neighbor_signal_events())
         self.last_events = events
         return events
 
@@ -124,7 +132,37 @@ class GeoAgent(ABC):
     async def act(self, decision: Decision) -> int:
         """Publish the current decision into the region alert channel."""
         channel = alert_channel(self.region_id)
-        return await self.bus(channel, decision)
+        delivered = await self.bus(channel, decision)
+        severity = str(decision.get("severity") or "").upper()
+        if severity in {"HIGH", "CRITICAL"}:
+            await self.broadcast_to_neighbors(decision)
+        return delivered
+
+    async def broadcast_to_neighbors(self, event: dict[str, Any]) -> int:
+        """Broadcast high-severity events to neighboring geo-agents."""
+        if not self.neighbor_region_ids:
+            return 0
+
+        broadcast_id = str(event.get("broadcast_id") or uuid4())
+        dedupe_key = f"broadcast:dedupe:{broadcast_id}"
+        if not await self._acquire_broadcast_dedupe(dedupe_key):
+            return 0
+
+        payload = {
+            **event,
+            "broadcast_id": broadcast_id,
+            "origin_region_id": self.region_id,
+            "broadcast_at": datetime.now(UTC).isoformat(),
+        }
+
+        delivered = 0
+        for neighbor_region_id in self.neighbor_region_ids:
+            delivered += await self.bus(broadcast_channel(neighbor_region_id), payload)
+        return delivered
+
+    def set_neighbors(self, neighbor_region_ids: list[str]) -> None:
+        """Configure neighboring regions used for cross-agent propagation."""
+        self.neighbor_region_ids = [region for region in neighbor_region_ids if region != self.region_id]
 
     async def run_cycle(self) -> Decision:
         """Execute one complete perceive → reason → act cycle."""
@@ -162,10 +200,23 @@ class GeoAgent(ABC):
             self._run(),
             name=f"geo-agent-{self.region_id}",
         )
+        self._broadcast_listener_task = asyncio.create_task(
+            self._listen_for_neighbor_broadcasts(),
+            name=f"geo-agent-broadcast-listener-{self.region_id}",
+        )
 
     async def stop(self) -> None:
         """Stop the agent loop and await task cancellation/termination."""
         self._stop_event.set()
+        if self._broadcast_listener_task is not None:
+            self._broadcast_listener_task.cancel()
+            try:
+                await self._broadcast_listener_task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._broadcast_listener_task = None
+
         if self._task is None:
             return
 
@@ -173,6 +224,53 @@ class GeoAgent(ABC):
             await self._task
         finally:
             self._task = None
+
+    async def _listen_for_neighbor_broadcasts(self) -> None:
+        """Subscribe to this region's broadcast channel and queue incoming signals."""
+        channel = broadcast_channel(self.region_id)
+
+        async def _handler(payload: dict[str, Any]) -> None:
+            signal = payload if isinstance(payload, dict) else {"raw": payload}
+            signal.setdefault("received_at", datetime.now(UTC).isoformat())
+            self._incoming_neighbor_signals.append(signal)
+            self._incoming_neighbor_signals = self._incoming_neighbor_signals[-50:]
+
+        try:
+            await subscribe(channel, _handler)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.bind(region_id=self.region_id).exception(
+                "Broadcast listener failed: {error}",
+                error=str(exc),
+            )
+
+    def _neighbor_signal_events(self) -> list[Event]:
+        if not self._incoming_neighbor_signals:
+            return []
+
+        center_lat = (self.bbox[1] + self.bbox[3]) / 2
+        center_lon = (self.bbox[0] + self.bbox[2]) / 2
+
+        signals = self._incoming_neighbor_signals
+        self._incoming_neighbor_signals = []
+
+        events: list[Event] = []
+        for signal in signals:
+            timestamp = self._parse_datetime(signal.get("broadcast_at") or signal.get("received_at"))
+            event_type = f"NEIGHBOR_ALERT_{str(signal.get('origin_region_id') or 'unknown').upper()}"
+            events.append(
+                Event(
+                    source="neighbor_broadcast",
+                    event_type=event_type,
+                    severity=str(signal.get("severity") or "MEDIUM"),
+                    lat=center_lat,
+                    lon=center_lon,
+                    timestamp=timestamp,
+                    raw=signal,
+                )
+            )
+        return events
 
     async def _retrieve_memory_episodes(self, events: list[Event]) -> list[MemoryEpisode]:
         if not hasattr(self.zep_client, "search_similar_episodes"):
@@ -220,7 +318,27 @@ class GeoAgent(ABC):
         return lines
 
     def _neighbor_alert_lines(self) -> list[str]:
-        return []
+        lines: list[str] = []
+        for signal in self._incoming_neighbor_signals[-10:]:
+            lines.append(
+                f"{signal.get('origin_region_id', 'unknown')} severity={signal.get('severity', 'MEDIUM')} "
+                f"reason={signal.get('reasoning', 'n/a')}"
+            )
+        return lines
+
+    async def _acquire_broadcast_dedupe(self, key: str) -> bool:
+        try:
+            client = get_redis_client()
+        except Exception:
+            return True
+
+        try:
+            acquired = await client.set(key, "1", ex=3600, nx=True)
+            return bool(acquired)
+        except Exception:
+            return True
+        finally:
+            await client.aclose()
 
     @staticmethod
     def _build_anomaly_description(events: list[Event]) -> str:
@@ -228,6 +346,19 @@ class GeoAgent(ABC):
             return "No active event signals"
         top_signals = [f"{event.source}:{event.event_type}:{event.severity}" for event in events[:6]]
         return " | ".join(top_signals)
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime:
+        if isinstance(value, datetime):
+            dt = value
+        elif isinstance(value, str) and value:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        else:
+            dt = datetime.now(UTC)
+
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
 
     @staticmethod
     def _episode_to_payload(episode: MemoryEpisode) -> dict[str, Any]:
