@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[020][ceb8e9d] feat(agents): add Gulf/Suez geo-agent with elevated risk sensitivity and geopolitical weighting
+
 [019][35e2562] feat(agents): add Europe geo-agent covering Rotterdam-Hamburg-Antwerp corridor
 
 [018][be78571] feat(agents): add SE Asia geo-agent with Malacca Strait context and AIS integration

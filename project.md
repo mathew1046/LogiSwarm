@@ -25,13 +25,13 @@
 
 ## Implementation Status
 
-**Overall:** 19/100 tasks complete · Phase 2 in progress
+**Overall:** 20/100 tasks complete · Phase 2 in progress
 
 | Phase | Tasks | Status | Complete |
 |---|---|---|---|
 | 0 — Foundation | 001–006 | ✅ Complete | 6/6 |
 | 1 — Data Ingestion | 007–013 | ✅ Complete | 7/7 |
-| 2 — Geo-Agent Core | 014–025 | 🔶 In progress | 6/12 |
+| 2 — Geo-Agent Core | 014–025 | 🔶 In progress | 7/12 |
 | 3 — Orchestration | 026–031 | 🔲 Not started | 0/6 |
 | 4 — Action Layer | 032–036 | 🔲 Not started | 0/5 |
 | 5 — Backend API | 037–043 | 🔲 Not started | 0/7 |
@@ -39,6 +39,6 @@
 | 7 — Polish | 059–072 | 🔲 Not started | 0/14 |
 | 8 — Advanced | 073–100 | 🔲 Not started | 0/28 |
 
-**Last completed task:** Task 019 — Europe Geo-Agent (Agent #02)  
-**Next task:** Task 020 — Gulf / Suez Geo-Agent (Agent #03)  
+**Last completed task:** Task 020 — Gulf / Suez Geo-Agent (Agent #03)  
+**Next task:** Task 021 — North America Geo-Agent (Agent #04)  
 **Blockers:** None
