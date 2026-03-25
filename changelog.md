@@ -1,6 +1,20 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[043][d8edba9] feat(backend): add startup logging with route table and dependency health display
+
+[042][1f0ed79] feat(report): add report storage and retrieval API with markdown support
+
+[041][1f0ed79] feat(report): implement ReportAgent for automated post-disruption analysis generation
+
+[040][135b5c9] feat(api): add agent configuration API with hot-reload support
+
+[039][ad69fa7] feat(api): add route registry with GeoJSON support and manual disruption override
+
+[038][a4cc727] feat(api): add shipment tracking with real-time risk exposure evaluation
+
+[037][d81a83f] feat(api): add SSE stream endpoint for real-time agent status and disruption events
+
 [036][0913f59] feat(actions): add decision audit log with full traceability and feedback loop
 
 [035][7a1db97] feat(actions): implement carrier rebooking automation with availability scoring
