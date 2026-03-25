@@ -1,0 +1,1 @@
+export { default as RiskMap } from './RiskMap.vue'
