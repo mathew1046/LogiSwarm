@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[035][7a1db97] feat(actions): implement carrier rebooking automation with availability scoring
+
 [034][f6a2d5b] feat(actions): add email notifier with HTML templates and per-region throttling
 
 [033][43e22c6] feat(actions): add Slack notifier with Block Kit formatting and one-click accept button
