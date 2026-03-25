@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[028][a82e4a7] feat(orchestrator): implement route optimization engine with multi-modal alternative scoring
+
 [027][c648169] feat(orchestrator): add disruption propagation model with weighted logistics graph
 
 [026][91b3886] feat(orchestrator): implement swarm orchestrator with cross-region signal aggregation
