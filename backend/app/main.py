@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.agents.agent_manager import agent_manager
-from app.api import agents_router, feeds_router, projects_router
+from app.api import agents_router, feeds_router, orchestrator_router, projects_router
 from app.bus.connection import close_redis_pool, init_redis_pool
 from app.orchestrator.orchestrator import swarm_orchestrator
 
@@ -107,6 +107,7 @@ app.add_middleware(CORSMiddleware, **_cors_config())
 app.include_router(projects_router)
 app.include_router(feeds_router)
 app.include_router(agents_router)
+app.include_router(orchestrator_router)
 
 
 @app.get("/health")

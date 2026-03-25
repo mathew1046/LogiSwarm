@@ -12,6 +12,7 @@ from app.agents.agent_manager import NEIGHBOR_MAP
 from app.bus.channels import ORCHESTRATOR_CASCADE_CHANNEL
 from app.bus.connection import get_redis_client
 from app.bus.publisher import publish
+from app.orchestrator.propagation_model import DisruptionPropagationModel, PropagationResult
 
 
 class AgentAssessment(BaseModel):
@@ -37,6 +38,7 @@ class SwarmOrchestrator:
         self._listener_task: asyncio.Task[None] | None = None
         self._correlation_task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
+        self.propagation_model = DisruptionPropagationModel()
 
     async def start(self) -> None:
         """Start alert listener and periodic cross-region correlation loop."""
@@ -137,6 +139,13 @@ class SwarmOrchestrator:
             if row_ts >= cutoff:
                 output.append(row)
         return output
+
+    def cascade_risk(self, *, trigger_region: str, severity: str) -> PropagationResult:
+        """Run propagation scoring for a trigger region/severity pair."""
+        return self.propagation_model.propagate(
+            trigger_region=trigger_region,
+            severity=severity.upper(),
+        )
 
     def _upsert_assessment(self, payload: dict[str, Any]) -> None:
         region_id = str(payload.get("region_id") or "unknown")
