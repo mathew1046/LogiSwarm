@@ -1,6 +1,12 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[031][9a63048] feat(orchestrator): add simulation mode for historical event replay and agent tuning
+
+[030][11f73ed] feat(orchestrator): add confidence threshold escalation logic with per-region tuning
+
+[029][b84da0b] feat(orchestrator): expose cascade risk scoring and global risk map via REST API
+
 [028][a82e4a7] feat(orchestrator): implement route optimization engine with multi-modal alternative scoring
 
 [027][c648169] feat(orchestrator): add disruption propagation model with weighted logistics graph
