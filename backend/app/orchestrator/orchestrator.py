@@ -157,6 +157,54 @@ class SwarmOrchestrator:
             payload=payload,
         )
 
+    async def run_simulation(self, *, scenario: str, start_date: datetime, end_date: datetime) -> dict[str, Any]:
+        """Replay historical scenario events and return detection-quality metrics."""
+        scenario_key = scenario.strip().lower()
+        events = self._scenario_events().get(scenario_key, [])
+
+        detections = 0
+        false_positives = 0
+        first_alert_at: datetime | None = None
+        replayed = 0
+
+        for event in events:
+            event_time = self._parse_datetime(event.get("timestamp"))
+            if not (start_date <= event_time <= end_date):
+                continue
+
+            replayed += 1
+            self._upsert_assessment(event)
+
+            severity = str(event.get("severity") or "LOW").upper()
+            confidence = float(event.get("confidence") or 0.0)
+            if severity in {"HIGH", "CRITICAL"}:
+                detections += 1
+                if first_alert_at is None:
+                    first_alert_at = event_time
+            elif confidence >= 0.7:
+                false_positives += 1
+
+        baseline = max(replayed, 1)
+        detection_rate = round(detections / baseline, 3)
+        false_positive_rate = round(false_positives / baseline, 3)
+        mean_time_to_alert_hours = 0.0
+        if first_alert_at is not None:
+            mean_time_to_alert_hours = round((first_alert_at - start_date).total_seconds() / 3600, 2)
+
+        return {
+            "scenario": scenario_key,
+            "window": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+            "records_replayed": replayed,
+            "metrics": {
+                "detection_rate": detection_rate,
+                "false_positive_rate": false_positive_rate,
+                "mean_time_to_alert_hours": mean_time_to_alert_hours,
+            },
+        }
+
     def _upsert_assessment(self, payload: dict[str, Any]) -> None:
         region_id = str(payload.get("region_id") or "unknown")
         confidence_raw = payload.get("confidence", 0.0)
@@ -197,5 +245,24 @@ class SwarmOrchestrator:
         if dt.tzinfo is None:
             return dt.replace(tzinfo=UTC)
         return dt.astimezone(UTC)
+
+    @staticmethod
+    def _scenario_events() -> dict[str, list[dict[str, Any]]]:
+        return {
+            "suez_2021": [
+                {"region_id": "gulf_suez", "severity": "CRITICAL", "confidence": 0.92, "timestamp": "2021-03-23T10:00:00Z"},
+                {"region_id": "se_asia", "severity": "HIGH", "confidence": 0.84, "timestamp": "2021-03-24T05:00:00Z"},
+                {"region_id": "europe", "severity": "HIGH", "confidence": 0.87, "timestamp": "2021-03-25T07:00:00Z"},
+            ],
+            "covid_port_closures_2020": [
+                {"region_id": "china_ea", "severity": "CRITICAL", "confidence": 0.9, "timestamp": "2020-02-01T08:00:00Z"},
+                {"region_id": "se_asia", "severity": "HIGH", "confidence": 0.81, "timestamp": "2020-02-03T08:00:00Z"},
+                {"region_id": "north_america", "severity": "MEDIUM", "confidence": 0.66, "timestamp": "2020-02-06T08:00:00Z"},
+            ],
+            "la_port_backlog_2021": [
+                {"region_id": "north_america", "severity": "HIGH", "confidence": 0.83, "timestamp": "2021-10-01T09:00:00Z"},
+                {"region_id": "europe", "severity": "MEDIUM", "confidence": 0.58, "timestamp": "2021-10-06T09:00:00Z"},
+            ],
+        }
 
 swarm_orchestrator = SwarmOrchestrator()

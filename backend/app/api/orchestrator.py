@@ -6,6 +6,7 @@ from app.api.schemas.orchestrator import (
     CascadeRiskRequest,
     EscalationRequest,
     OrchestratorEnvelope,
+    SimulateRequest,
 )
 from app.orchestrator.orchestrator import swarm_orchestrator
 
@@ -41,3 +42,13 @@ async def evaluate_escalation(payload: EscalationRequest) -> OrchestratorEnvelop
         payload=payload.model_dump(mode="json"),
     )
     return OrchestratorEnvelope(data=decision.model_dump(mode="json"), error=None, meta=None)
+
+
+@router.post("/simulate", response_model=OrchestratorEnvelope)
+async def simulate(payload: SimulateRequest) -> OrchestratorEnvelope:
+    report = await swarm_orchestrator.run_simulation(
+        scenario=payload.scenario,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+    )
+    return OrchestratorEnvelope(data=report, error=None, meta=None)
