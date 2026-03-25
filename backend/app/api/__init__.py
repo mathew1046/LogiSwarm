@@ -2,6 +2,7 @@ from app.api.actions import router as actions_router
 from app.api.feeds import router as feeds_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.projects import router as projects_router
+from app.api.reports import router as reports_router
 from app.api.routes import router as routes_router
 from app.api.shipments import router as shipments_router
 from app.api.sse import router as sse_router
@@ -16,4 +17,5 @@ __all__ = [
     "shipments_router",
     "sse_router",
     "routes_router",
+    "reports_router",
 ]

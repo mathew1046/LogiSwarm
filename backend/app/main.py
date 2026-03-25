@@ -15,6 +15,7 @@ from app.api import (
     feeds_router,
     orchestrator_router,
     projects_router,
+    reports_router,
     routes_router,
     shipments_router,
     sse_router,
@@ -118,6 +119,7 @@ app.include_router(orchestrator_router)
 app.include_router(actions_router)
 app.include_router(shipments_router)
 app.include_router(routes_router)
+app.include_router(reports_router)
 app.include_router(sse_router)
 
 
