@@ -1,6 +1,10 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[045][f788037] feat(frontend): build home page with hero, feature cards, and recent projects list
+
+[044][6ca15f2] feat(frontend): initialize Vue 3 app with Vue Router, Pinia, and global layout
+
 [043][d8edba9] feat(backend): add startup logging with route table and dependency health display
 
 [042][1f0ed79] feat(report): add report storage and retrieval API with markdown support
