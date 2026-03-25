@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[032][5b9aba3] feat(actions): implement TMS webhook client for auto-reroute with HMAC signing
+
 [031][9a63048] feat(orchestrator): add simulation mode for historical event replay and agent tuning
 
 [030][11f73ed] feat(orchestrator): add confidence threshold escalation logic with per-region tuning
