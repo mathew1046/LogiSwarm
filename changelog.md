@@ -1,6 +1,14 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[058][bf27e8e] feat(frontend): implement history database viewer with expandable cards
+
+[057][0a69b69] feat(frontend): implement report viewer with markdown rendering and interactive Q&A chat
+
+[056][0a69b69] feat(frontend): add interactive Q&A chat interface with suggested questions
+
+[055][33dfeda] feat(frontend): build agent configuration panel with live threshold preview
+
 [054][2b8d27f] feat(frontend): add in-app alert notification center with read/unread state
 
 [050][2b8d27f] feat(frontend): add real-time disruption event feed with filtering and virtualization
