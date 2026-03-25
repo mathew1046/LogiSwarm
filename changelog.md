@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[017][09a7237] feat(agents): implement rolling time-series state with z-score anomaly detection
+
 [016][5457e05] feat(agents): add Zep episodic memory with semantic retrieval and historical seeding
 
 [015][8af7e0a] feat(agents): integrate Claude LLM reasoning core with structured JSON output
