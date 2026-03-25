@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict
 
+from app.actions.audit_log import (
+    DecisionFeedbackPayload,
+    DecisionFeedbackResult,
+    DecisionLogCreatePayload,
+    DecisionLogResponse,
+)
 from app.actions.carrier_rebooking import CarrierRebookingRequest, CarrierRebookingResponse
 from app.actions.email_notifier import EmailAlertPayload, EmailNotifyResult
 from app.actions.slack_notifier import SlackAlertPayload, SlackNotifyResult
@@ -75,3 +84,44 @@ class CarrierRebookingDispatchResponse(BaseModel):
     """Typed response payload for carrier rebooking results."""
 
     result: CarrierRebookingResponse
+
+
+class DecisionCreateRequest(BaseModel):
+    """Request body for persisting a decision audit record."""
+
+    payload: DecisionLogCreatePayload
+
+
+class DecisionCreateResponse(BaseModel):
+    """Typed response payload for one created decision record."""
+
+    decision: DecisionLogResponse
+
+
+class DecisionFeedbackRequest(BaseModel):
+    """Request body for marking a decision outcome and feedback details."""
+
+    payload: DecisionFeedbackPayload
+
+
+class DecisionFeedbackResponse(BaseModel):
+    """Typed response payload for decision feedback update."""
+
+    result: DecisionFeedbackResult
+
+
+class DecisionListResponse(BaseModel):
+    """Typed list response payload for decision log queries."""
+
+    decisions: list[DecisionLogResponse]
+
+
+class DecisionListMeta(BaseModel):
+    """Pagination metadata returned by decision log list endpoint."""
+
+    total: int
+    limit: int
+    offset: int
+    project_id: str | None = None
+    region_id: str | None = None
+    generated_at: datetime

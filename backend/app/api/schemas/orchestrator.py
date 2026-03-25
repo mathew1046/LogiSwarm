@@ -25,8 +25,12 @@ class RouteOptimizeRequest(BaseModel):
 
 
 class EscalationRequest(BaseModel):
+    project_id: str
     region_id: str
     confidence: float = Field(ge=0.0, le=1.0)
+    input_events: dict[str, object] = Field(default_factory=dict)
+    output_action: dict[str, object] = Field(default_factory=dict)
+    human_override: bool = False
 
 
 class OrchestratorEnvelope(BaseModel):
