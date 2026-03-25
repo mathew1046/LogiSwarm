@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[036][0913f59] feat(actions): add decision audit log with full traceability and feedback loop
+
 [035][7a1db97] feat(actions): implement carrier rebooking automation with availability scoring
 
 [034][f6a2d5b] feat(actions): add email notifier with HTML templates and per-region throttling
