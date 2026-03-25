@@ -15,6 +15,7 @@ from app.api import (
     feeds_router,
     orchestrator_router,
     projects_router,
+    shipments_router,
     sse_router,
 )
 from app.bus.connection import close_redis_pool, init_redis_pool
@@ -114,6 +115,7 @@ app.include_router(feeds_router)
 app.include_router(agents_router)
 app.include_router(orchestrator_router)
 app.include_router(actions_router)
+app.include_router(shipments_router)
 app.include_router(sse_router)
 
 
