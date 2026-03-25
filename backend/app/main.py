@@ -8,7 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from app.api import feeds_router, projects_router
+from app.agents.agent_manager import agent_manager
+from app.api import agents_router, feeds_router, projects_router
 from app.bus.connection import close_redis_pool, init_redis_pool
 
 
@@ -83,8 +84,12 @@ async def lifespan(app: FastAPI):
     logger.bind(event="startup").info("Starting backend service")
     await init_redis_pool()
     logger.bind(event="startup").info("Redis connection pool initialized")
+    await agent_manager.start_all()
+    logger.bind(event="startup").info("Geo-agent manager started")
     _log_registered_routes(app)
     yield
+    await agent_manager.stop_all()
+    logger.bind(event="shutdown").info("Geo-agent manager stopped")
     await close_redis_pool()
     logger.bind(event="shutdown").info("Redis connection pool closed")
     logger.bind(event="shutdown").info("Shutting down backend service")
@@ -96,6 +101,7 @@ app = FastAPI(title="LogiSwarm Backend", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, **_cors_config())
 app.include_router(projects_router)
 app.include_router(feeds_router)
+app.include_router(agents_router)
 
 
 @app.get("/health")
