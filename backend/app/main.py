@@ -11,6 +11,7 @@ from loguru import logger
 from app.agents.agent_manager import agent_manager
 from app.api import agents_router, feeds_router, projects_router
 from app.bus.connection import close_redis_pool, init_redis_pool
+from app.orchestrator.orchestrator import swarm_orchestrator
 
 
 class MaxTokensWarningFilter(logging.Filter):
@@ -86,8 +87,12 @@ async def lifespan(app: FastAPI):
     logger.bind(event="startup").info("Redis connection pool initialized")
     await agent_manager.start_all()
     logger.bind(event="startup").info("Geo-agent manager started")
+    await swarm_orchestrator.start()
+    logger.bind(event="startup").info("Swarm orchestrator started")
     _log_registered_routes(app)
     yield
+    await swarm_orchestrator.stop()
+    logger.bind(event="shutdown").info("Swarm orchestrator stopped")
     await agent_manager.stop_all()
     logger.bind(event="shutdown").info("Geo-agent manager stopped")
     await close_redis_pool()
