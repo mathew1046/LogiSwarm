@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from app.actions.carrier_rebooking import CarrierRebookingRequest, CarrierRebookingResponse
 from app.actions.email_notifier import EmailAlertPayload, EmailNotifyResult
 from app.actions.slack_notifier import SlackAlertPayload, SlackNotifyResult
 from app.actions.tms_webhook import TMSDispatchResult, TMSWebhookPayload
@@ -62,3 +63,15 @@ class EmailDispatchResponse(BaseModel):
     """Typed response payload for email alert delivery results."""
 
     result: EmailNotifyResult
+
+
+class CarrierRebookingDispatchRequest(BaseModel):
+    """Request body for carrier rebooking automation."""
+
+    payload: CarrierRebookingRequest
+
+
+class CarrierRebookingDispatchResponse(BaseModel):
+    """Typed response payload for carrier rebooking results."""
+
+    result: CarrierRebookingResponse

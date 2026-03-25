@@ -3,14 +3,18 @@ from __future__ import annotations
 import json
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Depends, Header, Request
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.actions.carrier_rebooking import carrier_rebooking_service
 from app.actions.email_notifier import email_notifier
 from app.actions.slack_notifier import slack_notifier
 from app.actions.tms_webhook import TMSWebhookPayload, tms_webhook_client
 from app.api.schemas.actions import (
     ActionsEnvelope,
+    CarrierRebookingDispatchRequest,
+    CarrierRebookingDispatchResponse,
     EmailDispatchRequest,
     EmailDispatchResponse,
     SlackAcceptResponse,
@@ -19,6 +23,7 @@ from app.api.schemas.actions import (
     TMSDispatchRequest,
     TMSDispatchResponse,
 )
+from app.db.session import get_db_session
 
 router = APIRouter(tags=["actions"])
 
@@ -53,6 +58,20 @@ async def dispatch_email_alert(payload: EmailDispatchRequest) -> ActionsEnvelope
         data=EmailDispatchResponse(result=result),
         error=None,
         meta={"throttled": result.throttled},
+    )
+
+
+@router.post("/actions/carrier/rebook", response_model=ActionsEnvelope)
+async def dispatch_carrier_rebooking(
+    payload: CarrierRebookingDispatchRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> ActionsEnvelope:
+    """Run carrier rebooking automation in recommend or auto-act mode."""
+    result = await carrier_rebooking_service.process(payload.payload, session)
+    return ActionsEnvelope(
+        data=CarrierRebookingDispatchResponse(result=result),
+        error=None,
+        meta={"mode": result.mode, "shipments": len(result.results)},
     )
 
 
