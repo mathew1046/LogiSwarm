@@ -12,6 +12,7 @@ from app.agents.agent_manager import NEIGHBOR_MAP
 from app.bus.channels import ORCHESTRATOR_CASCADE_CHANNEL
 from app.bus.connection import get_redis_client
 from app.bus.publisher import publish
+from app.orchestrator.escalation import EscalationDecision, EscalationEngine
 from app.orchestrator.propagation_model import DisruptionPropagationModel, PropagationResult
 
 
@@ -39,6 +40,7 @@ class SwarmOrchestrator:
         self._correlation_task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
         self.propagation_model = DisruptionPropagationModel()
+        self.escalation_engine = EscalationEngine()
 
     async def start(self) -> None:
         """Start alert listener and periodic cross-region correlation loop."""
@@ -145,6 +147,14 @@ class SwarmOrchestrator:
         return self.propagation_model.propagate(
             trigger_region=trigger_region,
             severity=severity.upper(),
+        )
+
+    def evaluate_escalation(self, *, region_id: str, confidence: float, payload: dict[str, Any]) -> EscalationDecision:
+        """Evaluate confidence-based escalation level with per-region overrides."""
+        return self.escalation_engine.evaluate(
+            region_id=region_id,
+            confidence=confidence,
+            payload=payload,
         )
 
     def _upsert_assessment(self, payload: dict[str, Any]) -> None:

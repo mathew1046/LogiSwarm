@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 
 from app.api.schemas.orchestrator import (
     CascadeRiskRequest,
+    EscalationRequest,
     OrchestratorEnvelope,
 )
 from app.orchestrator.orchestrator import swarm_orchestrator
@@ -30,3 +31,13 @@ async def risk_map() -> OrchestratorEnvelope:
 async def risk_map_history(hours: int = Query(default=24, ge=1, le=168)) -> OrchestratorEnvelope:
     history = swarm_orchestrator.get_risk_map_history(hours=hours)
     return OrchestratorEnvelope(data=history, error=None, meta={"hours": hours, "total": len(history)})
+
+
+@router.post("/escalation", response_model=OrchestratorEnvelope)
+async def evaluate_escalation(payload: EscalationRequest) -> OrchestratorEnvelope:
+    decision = swarm_orchestrator.evaluate_escalation(
+        region_id=payload.region_id,
+        confidence=payload.confidence,
+        payload=payload.model_dump(mode="json"),
+    )
+    return OrchestratorEnvelope(data=decision.model_dump(mode="json"), error=None, meta=None)
