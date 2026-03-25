@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[018][be78571] feat(agents): add SE Asia geo-agent with Malacca Strait context and AIS integration
+
 [017][09a7237] feat(agents): implement rolling time-series state with z-score anomaly detection
 
 [016][5457e05] feat(agents): add Zep episodic memory with semantic retrieval and historical seeding
