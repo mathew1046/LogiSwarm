@@ -4,13 +4,18 @@ import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from typing import Any
 
 from loguru import logger
 
+from app.agents.prompt_builder import AgentPromptBuilder
 from app.bus.channels import alert_channel
 from app.bus.publisher import publish
 from app.feeds.aggregator import Event, FeedAggregator
+
+if TYPE_CHECKING:
+    from app.agents.memory import MemoryEpisode
 
 
 Decision = dict[str, Any]
@@ -30,6 +35,7 @@ class GeoAgent(ABC):
         bus: Callable[[str, dict[str, Any]], Awaitable[int]] | None = None,
         poll_interval_seconds: int = 60,
         aggregator: FeedAggregator | None = None,
+        prompt_builder: AgentPromptBuilder | None = None,
     ) -> None:
         self.region_id = region_id
         self.region_name = region_name
@@ -40,6 +46,7 @@ class GeoAgent(ABC):
 
         self.poll_interval_seconds = poll_interval_seconds
         self.aggregator = aggregator or FeedAggregator()
+        self.prompt_builder = prompt_builder or AgentPromptBuilder()
 
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
@@ -63,11 +70,26 @@ class GeoAgent(ABC):
 
     async def reason(self, events: list[Event]) -> Decision:
         """Run LLM reasoning over current events and memory context."""
+        memory_episodes = await self._retrieve_memory_episodes(events)
+        memory_lines = self._format_memory_lines(memory_episodes)
+        recent_resolved_lines = self._recent_resolved_lines(memory_episodes)
+        neighbor_alert_lines = self._neighbor_alert_lines()
+
+        dynamic_system_prompt = self.prompt_builder.build_prompt(
+            base_prompt=self.get_system_prompt(),
+            memory_lines=memory_lines,
+            recent_resolved_lines=recent_resolved_lines,
+            neighbor_alert_lines=neighbor_alert_lines,
+        )
+
         payload = {
             "region_id": self.region_id,
             "region_name": self.region_name,
-            "system_prompt": self.get_system_prompt(),
+            "system_prompt": dynamic_system_prompt,
             "events": [event.model_dump(mode="json") for event in events],
+            "memory_episodes": [
+                self._episode_to_payload(episode) for episode in memory_episodes
+            ],
         }
 
         if hasattr(self.llm_client, "reason"):
@@ -151,3 +173,72 @@ class GeoAgent(ABC):
             await self._task
         finally:
             self._task = None
+
+    async def _retrieve_memory_episodes(self, events: list[Event]) -> list[MemoryEpisode]:
+        if not hasattr(self.zep_client, "search_similar_episodes"):
+            return []
+
+        anomaly_description = self._build_anomaly_description(events)
+        try:
+            result = await self.zep_client.search_similar_episodes(
+                region_id=self.region_id,
+                anomaly_description=anomaly_description,
+                top_k=3,
+            )
+        except Exception:
+            return []
+
+        return result if isinstance(result, list) else []
+
+    def _format_memory_lines(self, episodes: list[MemoryEpisode]) -> list[str]:
+        if hasattr(self.zep_client, "format_few_shot_context"):
+            try:
+                lines = self.zep_client.format_few_shot_context(episodes)
+                if isinstance(lines, list):
+                    return [str(line) for line in lines]
+            except Exception:
+                pass
+
+        lines: list[str] = []
+        for episode in episodes:
+            lines.append(
+                f"Similar past event [{episode.created_at.date().isoformat()}]: {episode.content} "
+                f"→ Outcome: {episode.metadata.resolution}"
+            )
+        return lines
+
+    @staticmethod
+    def _recent_resolved_lines(episodes: list[MemoryEpisode]) -> list[str]:
+        cutoff = datetime.now(UTC).replace(microsecond=0)
+        lines: list[str] = []
+        for episode in episodes:
+            age_days = (cutoff - episode.created_at).days
+            if age_days <= 30:
+                lines.append(
+                    f"{episode.created_at.date().isoformat()} | {episode.metadata.severity} | {episode.content}"
+                )
+        return lines
+
+    def _neighbor_alert_lines(self) -> list[str]:
+        return []
+
+    @staticmethod
+    def _build_anomaly_description(events: list[Event]) -> str:
+        if not events:
+            return "No active event signals"
+        top_signals = [f"{event.source}:{event.event_type}:{event.severity}" for event in events[:6]]
+        return " | ".join(top_signals)
+
+    @staticmethod
+    def _episode_to_payload(episode: MemoryEpisode) -> dict[str, Any]:
+        return {
+            "episode_id": episode.episode_id,
+            "content": episode.content,
+            "metadata": {
+                "region_id": episode.metadata.region_id,
+                "severity": episode.metadata.severity,
+                "duration_hours": episode.metadata.duration_hours,
+                "resolution": episode.metadata.resolution,
+            },
+            "created_at": episode.created_at.isoformat(),
+        }
