@@ -127,3 +127,23 @@ class VesselPosition(Base):
     status: Mapped[str] = mapped_column(String(64), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     raw: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class DecisionLog(Base):
+    __tablename__ = "decision_log"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    region_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    decision_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    input_events: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    output_action: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    human_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    outcome: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
