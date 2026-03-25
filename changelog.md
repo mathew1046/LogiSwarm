@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[019][35e2562] feat(agents): add Europe geo-agent covering Rotterdam-Hamburg-Antwerp corridor
+
 [018][be78571] feat(agents): add SE Asia geo-agent with Malacca Strait context and AIS integration
 
 [017][09a7237] feat(agents): implement rolling time-series state with z-score anomaly detection
