@@ -9,7 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.agents.agent_manager import agent_manager
-from app.api import actions_router, agents_router, feeds_router, orchestrator_router, projects_router
+from app.api import (
+    actions_router,
+    agents_router,
+    feeds_router,
+    orchestrator_router,
+    projects_router,
+    sse_router,
+)
 from app.bus.connection import close_redis_pool, init_redis_pool
 from app.orchestrator.orchestrator import swarm_orchestrator
 
@@ -55,9 +62,7 @@ def _cors_config() -> Dict[str, Any]:
 
     allowed_origins_env = os.getenv("CORS_ALLOW_ORIGINS", "")
     allowed_origins: List[str] = [
-        origin.strip()
-        for origin in allowed_origins_env.split(",")
-        if origin.strip()
+        origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()
     ]
 
     return {
@@ -109,6 +114,7 @@ app.include_router(feeds_router)
 app.include_router(agents_router)
 app.include_router(orchestrator_router)
 app.include_router(actions_router)
+app.include_router(sse_router)
 
 
 @app.get("/health")
