@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[015][8af7e0a] feat(agents): integrate Claude LLM reasoning core with structured JSON output
+
 [014][59abe62] feat(agents): implement GeoAgent base class with perceive-reason-act lifecycle
 
 [013][77e38ad] feat(feeds): add connector health monitoring endpoint with degradation detection
