@@ -6,10 +6,13 @@ from urllib.parse import parse_qs
 from fastapi import APIRouter, Header, Request
 from loguru import logger
 
+from app.actions.email_notifier import email_notifier
 from app.actions.slack_notifier import slack_notifier
 from app.actions.tms_webhook import TMSWebhookPayload, tms_webhook_client
 from app.api.schemas.actions import (
     ActionsEnvelope,
+    EmailDispatchRequest,
+    EmailDispatchResponse,
     SlackAcceptResponse,
     SlackDispatchRequest,
     SlackDispatchResponse,
@@ -39,6 +42,17 @@ async def dispatch_slack_alert(payload: SlackDispatchRequest) -> ActionsEnvelope
         data=SlackDispatchResponse(result=result),
         error=None,
         meta={"delivered": result.ok},
+    )
+
+
+@router.post("/actions/email/alert", response_model=ActionsEnvelope)
+async def dispatch_email_alert(payload: EmailDispatchRequest) -> ActionsEnvelope:
+    """Dispatch disruption alert via HTML email with per-region throttling."""
+    result = await email_notifier.send_alert(payload.payload)
+    return ActionsEnvelope(
+        data=EmailDispatchResponse(result=result),
+        error=None,
+        meta={"throttled": result.throttled},
     )
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from app.actions.email_notifier import EmailAlertPayload, EmailNotifyResult
 from app.actions.slack_notifier import SlackAlertPayload, SlackNotifyResult
 from app.actions.tms_webhook import TMSDispatchResult, TMSWebhookPayload
 
@@ -49,3 +50,15 @@ class SlackAcceptResponse(BaseModel):
     project_id: str | None = None
     region_id: str | None = None
     recommendation: str | None = None
+
+
+class EmailDispatchRequest(BaseModel):
+    """Request body for dispatching disruption alerts via email."""
+
+    payload: EmailAlertPayload
+
+
+class EmailDispatchResponse(BaseModel):
+    """Typed response payload for email alert delivery results."""
+
+    result: EmailNotifyResult
