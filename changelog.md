@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[033][43e22c6] feat(actions): add Slack notifier with Block Kit formatting and one-click accept button
+
 [032][5b9aba3] feat(actions): implement TMS webhook client for auto-reroute with HMAC signing
 
 [031][9a63048] feat(orchestrator): add simulation mode for historical event replay and agent tuning
