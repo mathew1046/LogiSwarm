@@ -1,11 +1,11 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[072][1fc350c] feat(demo): add seed script and one-command demo with Suez 2021 simulation scenario
+
 [071][fcf2af7] docs(readme): add comprehensive README with architecture, setup, and API documentation
 
 [070][1ec31fe] ci: add GitHub Actions pipeline with lint, test, build, and deploy stages
-
-[069][50d5a1a] perf(frontend): optimize bundle with lazy routes, tree-shaking, and chunk splitting
 
 [062][7b1573d] feat(backend): add LLM semaphore and rate limiting with cost guard and usage logging
 
