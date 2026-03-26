@@ -34,6 +34,7 @@ from app.agents.agent_manager import agent_manager
 from app.api import (
     actions_router,
     agents_router,
+    anomaly_router,
     disruptions_router,
     feeds_router,
     metrics_router,
@@ -169,6 +170,7 @@ app.include_router(sse_router)
 app.include_router(metrics_router)
 app.include_router(recommendations_router)
 app.include_router(disruptions_router)
+app.include_router(anomaly_router)
 
 
 @app.get("/health")
