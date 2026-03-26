@@ -81,6 +81,15 @@ class ReportAgent:
         "Lessons Learned",
     ]
 
+    LANGUAGE_INSTRUCTIONS = {
+        "en": "Write the report in English. Use standard professional English terminology.",
+        "zh": "用中文撰写报告。使用专业的中文供应链术语。将所有引用内容翻译成中文。",
+        "es": "Escriba el informe en español. Use terminología profesional de cadena de suministro.",
+        "de": "Schreiben Sie den Bericht auf Deutsch. Verwenden Sie die professionelle Lieferketten-Terminologie.",
+        "fr": "Rédigez le rapport en français. Utilisez la terminologie professionnelle de la chaîne d'approvisionnement.",
+        "ja": "レポートを日本語で作成してください。専門サプライチェーン用語を使用してください。",
+    }
+
     def __init__(self, llm_client: Any | None = None) -> None:
         self.llm_client = llm_client
         self._tool_results: list[ReportAgentToolResult] = []
@@ -91,9 +100,11 @@ class ReportAgent:
         project_id: str,
         disruption_id: UUID,
         session: Any,
+        language: str = "en",
     ) -> str:
-        """Generate a comprehensive post-disruption analysis report."""
+        """Generate a comprehensive post-disruption analysis report in the specified language."""
         self._tool_results = []
+        self._language = language if language in self.LANGUAGE_INSTRUCTIONS else "en"
 
         context = await self._gather_context(project_id, disruption_id, session)
 
@@ -111,6 +122,7 @@ class ReportAgent:
             lessons=lessons_md,
             generated_at=datetime.now(UTC).isoformat(),
             disruption_id=str(disruption_id),
+            language=self._language,
         )
 
         return report
@@ -447,14 +459,35 @@ class ReportAgent:
         lessons: str,
         generated_at: str,
         disruption_id: str,
+        language: str = "en",
     ) -> str:
-        """Assemble full report markdown."""
-        return f"""# Post-Disruption Analysis Report
+        """Assemble full report markdown in the specified language."""
+        lang_instruction = self.LANGUAGE_INSTRUCTIONS.get(
+            language, self.LANGUAGE_INSTRUCTIONS["en"]
+        )
 
-**Disruption ID:** {disruption_id}
-**Generated At:** {generated_at}
+        if language == "zh":
+            header = "# 灾后分析报告"
+            generated_text = f"**报告编号:** {disruption_id}\n**生成时间:** {generated_at}\n\n{lang_instruction}\n"
+        elif language == "es":
+            header = "# Informe de Análisis Post-Disrupción"
+            generated_text = f"**ID de Disrupción:** {disruption_id}\n**Generado:** {generated_at}\n\n{lang_instruction}\n"
+        elif language == "de":
+            header = "# Analysebericht nach Störung"
+            generated_text = f"**Störungs-ID:** {disruption_id}\n**Erstellt:** {generated_at}\n\n{lang_instruction}\n"
+        elif language == "fr":
+            header = "# Rapport d'Analyse Post-Perturbation"
+            generated_text = f"**ID de Perturbation:** {disruption_id}\n**Généré:** {generated_at}\n\n{lang_instruction}\n"
+        elif language == "ja":
+            header = "# 事後分析レポート"
+            generated_text = f"**障害ID:** {disruption_id}\n**生成日時:** {generated_at}\n\n{lang_instruction}\n"
+        else:
+            header = "# Post-Disruption Analysis Report"
+            generated_text = f"**Disruption ID:** {disruption_id}\n**Generated At:** {generated_at}\n\n{lang_instruction}\n"
 
----
+        return f"""{header}
+
+{generated_text}---
 
 ## Executive Summary
 

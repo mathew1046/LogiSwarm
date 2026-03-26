@@ -226,6 +226,7 @@ class Report(Base):
         String(64), nullable=False, default="post_disruption"
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

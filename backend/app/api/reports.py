@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,6 +15,8 @@ from app.report.report_agent import report_agent
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
+SupportedLanguage = Literal["en", "zh", "es", "de", "fr", "ja"]
+
 
 class ReportCreate(BaseModel):
     """Request body for generating a new report."""
@@ -22,6 +24,9 @@ class ReportCreate(BaseModel):
     project_id: str = Field(min_length=1)
     disruption_id: UUID | None = None
     report_type: str = Field(default="post_disruption", max_length=64)
+    language: SupportedLanguage = Field(
+        default="en", description="Report language: en, zh, es, de, fr, ja"
+    )
 
 
 class ReportResponse(BaseModel):
@@ -34,6 +39,7 @@ class ReportResponse(BaseModel):
     disruption_id: UUID | None
     report_type: str
     content: str
+    language: str
     generated_at: datetime
 
 
@@ -61,12 +67,19 @@ async def generate_report(
     payload: ReportCreate,
     session: AsyncSession = Depends(get_db_session),
 ) -> ReportEnvelope:
-    """Generate a new post-disruption analysis report."""
+    """Generate a new post-disruption analysis report in the specified language."""
+    language = (
+        payload.language
+        if payload.language in ("en", "zh", "es", "de", "fr", "ja")
+        else "en"
+    )
+
     content = await report_agent.generate_report(
         project_id=payload.project_id,
         disruption_id=payload.disruption_id
         or UUID("00000000-0000-0000-0000-000000000000"),
         session=session,
+        language=language,
     )
 
     record = Report(
@@ -74,13 +87,16 @@ async def generate_report(
         disruption_id=payload.disruption_id,
         report_type=payload.report_type,
         content=content,
+        language=language,
     )
     session.add(record)
     await session.commit()
     await session.refresh(record)
 
     return ReportEnvelope(
-        data=_report_to_response(record), error=None, meta={"generated": True}
+        data=_report_to_response(record),
+        error=None,
+        meta={"generated": True, "language": language},
     )
 
 
@@ -89,6 +105,7 @@ async def list_reports(
     project_id: str | None = Query(default=None),
     disruption_id: UUID | None = Query(default=None),
     report_type: str | None = Query(default=None),
+    language: str | None = Query(default=None, description="Filter by language code"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
@@ -108,6 +125,10 @@ async def list_reports(
     if report_type:
         total_stmt = total_stmt.where(Report.report_type == report_type)
         data_stmt = data_stmt.where(Report.report_type == report_type)
+
+    if language:
+        total_stmt = total_stmt.where(Report.language == language)
+        data_stmt = data_stmt.where(Report.language == language)
 
     total = (await session.execute(total_stmt)).scalar_one()
 
@@ -179,5 +200,6 @@ def _report_to_response(record: Report) -> ReportResponse:
         disruption_id=record.disruption_id,
         report_type=record.report_type,
         content=record.content,
+        language=record.language,
         generated_at=record.generated_at,
     )
