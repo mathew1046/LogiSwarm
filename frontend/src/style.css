@@ -495,20 +495,66 @@ input, select, textarea {
   
   .app-layout__sidebar {
     transform: translateX(-100%);
+    width: 280px;
+    transition: transform var(--transition-normal);
   }
   
   .app-layout__sidebar--open {
     transform: translateX(0);
-    width: 280px;
   }
   
   .app-layout__main {
     margin-left: 0;
   }
   
+  .app-layout__topbar {
+    padding: 0 var(--spacing-4);
+  }
+  
+  .topbar-left,
+  .topbar-right {
+    gap: var(--spacing-2);
+  }
+  
+  .project-selector {
+    padding: var(--spacing-1) var(--spacing-2);
+    font-size: var(--text-sm);
+  }
+  
   .grid--2,
   .grid--3,
   .grid--4 {
     grid-template-columns: 1fr;
+  }
+  
+  .card {
+    padding: var(--spacing-4);
+  }
+  
+  .card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-2);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+  
+  .grid--3,
+  .grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1025px) {
+  .grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .grid--4 {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
