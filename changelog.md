@@ -1,6 +1,7 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[074][9bd0fa5] feat(orchestrator): add predictive ETA recalculation for affected shipments on disruption
 [073][2b80e2c] feat(routes): extend optimizer with multi-modal sea/air/rail graph and handoff nodes
 [082][08aa2aa] feat(ops): add Prometheus metrics endpoint with per-region agent and LLM metrics
 [095][ccaa528] chore(legal): add AGPL-3.0 license and third-party attribution notices

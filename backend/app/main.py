@@ -43,8 +43,10 @@ from app.api import (
     shipments_router,
     sse_router,
 )
+from app.api.shipments import start_risk_evaluator
 from app.bus.connection import close_redis_pool, init_redis_pool
 from app.db.session import engine
+from app.orchestrator.eta_recalculator import eta_recalculator
 from app.orchestrator.orchestrator import swarm_orchestrator
 from app.shutdown import register_shutdown_handler, setup_signal_handlers
 
@@ -80,6 +82,68 @@ def configure_logging() -> None:
 
 validate_env()
 configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    startup_logs: List[Dict[str, Any]] = []
+    startup_logs.append(
+        {"event": "startup", "message": "Initializing LogiSwarm backend"}
+    )
+
+    await init_redis_pool()
+    startup_logs.append(
+        {"event": "startup", "component": "redis", "status": "connected"}
+    )
+
+    await swarm_orchestrator.start()
+    startup_logs.append(
+        {"event": "startup", "component": "orchestrator", "status": "started"}
+    )
+
+    await agent_manager.start_all()
+    startup_logs.append(
+        {"event": "startup", "component": "agents", "count": len(agent_manager.agents)}
+    )
+
+    await eta_recalculator.start()
+    startup_logs.append(
+        {"event": "startup", "component": "eta_recalculator", "status": "started"}
+    )
+
+    await start_risk_evaluator()
+    startup_logs.append(
+        {"event": "startup", "component": "risk_evaluator", "status": "started"}
+    )
+
+    register_shutdown_handler(lambda: swarm_orchestrator.stop())
+    register_shutdown_handler(lambda: agent_manager.stop_all())
+    register_shutdown_handler(lambda: eta_recalculator.stop())
+    register_shutdown_handler(lambda: close_redis_pool())
+
+    for entry in startup_logs:
+        logger.info(entry)
+
+    _print_route_table(app)
+    yield
+
+    logger.info({"event": "shutdown", "message": "Shutting down LogiSwarm backend"})
+
+
+def _print_route_table(app: FastAPI) -> None:
+    routes: List[Dict[str, str]] = []
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            for method in route.methods:
+                if method != "HEAD":
+                    routes.append({"method": method, "path": route.path})
+    routes.sort(key=lambda r: r["path"])
+    max_method_len = max(len(r["method"]) for r in routes) if routes else 7
+    header = f"{'METHOD':<{max_method_len}} PATH"
+    logger.info({"event": "route_table", "header": header})
+    for r in routes:
+        logger.info({"event": "route", "method": r["method"], "path": r["path"]})
+
 
 app = FastAPI(title="LogiSwarm Backend", version="0.1.0", lifespan=lifespan)
 

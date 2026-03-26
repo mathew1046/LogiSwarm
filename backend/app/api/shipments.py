@@ -43,6 +43,8 @@ class ShipmentResponse(BaseModel):
     route: list[str]
     status: str
     eta: datetime | None
+    predicted_eta: datetime | None = None
+    delay_hours: float | None = None
     risk_level: str
     disrupted_regions: list[str]
     recommended_actions: list[str]
@@ -314,6 +316,8 @@ def _shipment_to_response(
         route=route,
         status=record.status,
         eta=record.eta,
+        predicted_eta=record.predicted_eta,
+        delay_hours=record.delay_hours,
         risk_level=risk_info.get("risk_level", "LOW"),
         disrupted_regions=risk_info.get("disrupted_regions", []),
         recommended_actions=[],
