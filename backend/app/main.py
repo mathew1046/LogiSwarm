@@ -19,6 +19,8 @@ def _ensure_utf8_stdout() -> None:
 
 _ensure_utf8_stdout()
 
+from app.config import validate_env
+
 from app.agents.agent_manager import agent_manager
 from app.api import (
     actions_router,
@@ -64,6 +66,10 @@ def configure_logging() -> None:
         diagnose=False,
     )
     _configure_stdlib_logging_filter()
+
+
+validate_env()
+configure_logging()
 
 
 def _cors_config() -> Dict[str, Any]:
