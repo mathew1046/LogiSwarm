@@ -1,7 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
-[076][12f681c] feat(agents): add CSV/JSON memory seeding endpoint for historical disruption data upload
+[077][09e85f3] feat(agents): implement dynamic graph memory update on disruption resolution
+[076][5705e39] feat(agents): add CSV/JSON memory seeding endpoint for historical disruption data upload
 [075][655b4ea] feat(orchestrator): add inventory buffer recommendation engine for upstream planning
 [074][4112301] feat(orchestrator): add predictive ETA recalculation for affected shipments on disruption
 [073][2b80e2c] feat(routes): extend optimizer with multi-modal sea/air/rail graph and handoff nodes
