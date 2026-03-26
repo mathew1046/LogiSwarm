@@ -1,11 +1,11 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[068][e5eabca] style(frontend): add responsive layouts for tablet and mobile viewports
+
 [067][a34d845] feat(frontend): add skeleton loaders, error states, and empty states to all panels
 
 [066][4899d70] feat(api): add global error handling with consistent error envelope and request IDs
-
-[065][6185bb4] feat(api): implement cursor-based pagination for all list endpoints
 
 [062][7b1573d] feat(backend): add LLM semaphore and rate limiting with cost guard and usage logging
 
