@@ -1,0 +1,87 @@
+LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
+Copyright (C) 2025 
+
+This product includes software developed by third parties:
+
+================================================================================
+THIRD-PARTY SOFTWARE NOTICES
+================================================================================
+
+FastAPI
+Copyright (c) 2018 Sebastián Ramírez
+MIT License
+
+Vue.js
+Copyright (c) 2014-present Evan You
+MIT License
+
+PostgreSQL
+Copyright (c) 1996-2024, PostgreSQL Global Development Group
+PostgreSQL License
+
+Redis
+Copyright (c) 2006-2024, Redis Ltd.
+BSD 3-Clause License
+
+TimescaleDB
+Copyright (c) 2015-2024, Timescale Inc.
+Apache License 2.0
+
+Anthropic Claude API
+Copyright (c) Anthropic
+Commercial License - API Usage Subject to Anthropic Terms of Service
+
+Zep Cloud
+Copyright (c) Zep Technologies
+Commercial License - Subject to Zep Terms of Service
+
+Leaflet.js
+Copyright (c) 2010-2024, Vladimir Agafonkin
+BSD 2-Clause License
+
+D3.js
+Copyright (c) 2010-2024, Mike Bostock
+BSD 3-Clause License
+
+Pydantic
+Copyright (c) 2017-present, Samuel Colvin
+MIT License
+
+SQLAlchemy
+Copyright (c) 2005-2024, SQLAlchemy authors and contributors
+MIT License
+
+================================================================================
+OPEN DATA SOURCES
+================================================================================
+
+OpenStreetMap
+Copyright (c) OpenStreetMap contributors
+ODbL License - https://opendatacommons.org/licenses/odbl/
+
+GDELT Project
+Public Domain - https://www.gdeltproject.org/
+
+================================================================================
+ICONS AND ASSETS
+================================================================================
+
+Heroicons
+Copyright (c) Tailwind Labs
+MIT License
+
+================================================================================
+This product uses the following open source packages:
+
+Python packages (see pyproject.toml for full list):
+- fastapi, uvicorn, sqlalchemy, asyncpg, redis, httpx, pydantic, loguru
+
+JavaScript packages (see package.json for full list):
+- vue, vue-router, pinia, leaflet, d3, vite
+
+================================================================================
+CONTACT
+================================================================================
+
+For questions about licensing or third-party components:
+https://github.com/your-org/logiswarm/issues
