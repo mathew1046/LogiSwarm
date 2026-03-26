@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[065][6185bb4] feat(api): implement cursor-based pagination for all list endpoints
+
 [064][0d2e490] fix(config): environment variables take precedence over .env for deployment flexibility
 
 [063][d4c1629] fix(feeds): handle non-UTF-8 encoded data files with automatic encoding detection
