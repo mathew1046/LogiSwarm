@@ -35,6 +35,7 @@ from app.api import (
     actions_router,
     agents_router,
     feeds_router,
+    metrics_router,
     orchestrator_router,
     projects_router,
     reports_router,
@@ -99,6 +100,7 @@ app.include_router(shipments_router)
 app.include_router(routes_router)
 app.include_router(reports_router)
 app.include_router(sse_router)
+app.include_router(metrics_router)
 
 
 @app.get("/health")
