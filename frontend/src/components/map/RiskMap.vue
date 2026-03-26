@@ -1,14 +1,18 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useAgentStore } from '@/stores/agent'
+import { useThemeStore } from '@/stores/theme'
 
 const mapContainer = ref(null)
 const selectedRegion = ref(null)
 const map = ref(null)
 const layers = ref({})
+const baseLayer = ref(null)
 
 const agentStore = useAgentStore()
+const themeStore = useThemeStore()
 const riskMap = computed(() => agentStore.riskMap)
+const isDark = computed(() => themeStore.isDark())
 
 const REGIONS = {
   se_asia: {
@@ -77,12 +81,35 @@ function initMap() {
     maxZoom: 10
   })
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    noWrap: true
-  }).addTo(map.value)
-
+  updateBaseLayer()
   updateRegions()
+}
+
+function updateBaseLayer() {
+  if (!map.value || typeof window === 'undefined') return
+  
+  const L = window.L
+  if (!L) return
+  
+  if (baseLayer.value) {
+    map.value.removeLayer(baseLayer.value)
+  }
+  
+  if (isDark.value) {
+    baseLayer.value = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+      noWrap: true
+    })
+  } else {
+    baseLayer.value = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      noWrap: true
+    })
+  }
+  
+  baseLayer.value.addTo(map.value)
 }
 
 function updateRegions() {
@@ -133,6 +160,10 @@ function handleSSEUpdate() {
 watch(riskMap, () => {
   updateRegions()
 }, { deep: true })
+
+watch(isDark, () => {
+  updateBaseLayer()
+})
 
 onMounted(async () => {
   await agentStore.fetchRiskMap()
