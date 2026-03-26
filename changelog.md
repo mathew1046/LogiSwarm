@@ -1,11 +1,11 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[069][50d5a1a] perf(frontend): optimize bundle with lazy routes, tree-shaking, and chunk splitting
+
 [068][e5eabca] style(frontend): add responsive layouts for tablet and mobile viewports
 
 [067][a34d845] feat(frontend): add skeleton loaders, error states, and empty states to all panels
-
-[066][4899d70] feat(api): add global error handling with consistent error envelope and request IDs
 
 [062][7b1573d] feat(backend): add LLM semaphore and rate limiting with cost guard and usage logging
 
