@@ -38,6 +38,7 @@ from app.api import (
     metrics_router,
     orchestrator_router,
     projects_router,
+    recommendations_router,
     reports_router,
     routes_router,
     shipments_router,
@@ -165,6 +166,7 @@ app.include_router(routes_router)
 app.include_router(reports_router)
 app.include_router(sse_router)
 app.include_router(metrics_router)
+app.include_router(recommendations_router)
 
 
 @app.get("/health")

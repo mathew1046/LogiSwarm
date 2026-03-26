@@ -1,4 +1,5 @@
 from app.orchestrator.eta_recalculator import ETARecalculator, eta_recalculator
+from app.orchestrator.inventory_advisor import InventoryAdvisor, inventory_advisor
 from app.orchestrator.orchestrator import swarm_orchestrator
 from app.orchestrator.propagation_model import (
     DisruptionPropagationModel,
@@ -17,4 +18,6 @@ __all__ = [
     "RouteOptimizationResult",
     "ETARecalculator",
     "eta_recalculator",
+    "InventoryAdvisor",
+    "inventory_advisor",
 ]
