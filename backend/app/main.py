@@ -8,6 +8,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+
+def _ensure_utf8_stdout() -> None:
+    if sys.platform == "win32" and sys.stdout.encoding != "utf-8":
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8")
+
+
+_ensure_utf8_stdout()
+
 from app.agents.agent_manager import agent_manager
 from app.api import (
     actions_router,

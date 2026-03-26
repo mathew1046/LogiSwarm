@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[059][f430d56] style(frontend): implement full dark mode with CSS variables and user preference persistence
+
 [058][bf27e8e] feat(frontend): implement history database viewer with expandable cards
 
 [057][0a69b69] feat(frontend): implement report viewer with markdown rendering and interactive Q&A chat
