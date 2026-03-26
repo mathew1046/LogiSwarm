@@ -1,7 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
-[081][795ea3e] feat(auth): implement JWT-based RBAC with viewer/operator/admin roles
+[083][508361f] feat(api): add WebSocket endpoint for low-latency agent pulse and disruption alerts
+[081][b0cfa81] feat(auth): implement JWT-based RBAC with viewer/operator/admin roles
 [080][5ae2c53] feat(api): add bulk shipment CSV import with validation and background risk assessment
 [079][7812e70] feat(backend): add dual LLM configuration with primary/fallback auto-switching
 [078][47cbfcf] feat(agents): add anomaly detection tuning API with adaptive threshold adjustment

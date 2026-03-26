@@ -46,6 +46,7 @@ from app.api import (
     routes_router,
     shipments_router,
     sse_router,
+    websocket_router,
 )
 from app.api.shipments import start_risk_evaluator
 from app.bus.connection import close_redis_pool, init_redis_pool
@@ -173,6 +174,7 @@ app.include_router(recommendations_router)
 app.include_router(disruptions_router)
 app.include_router(anomaly_router)
 app.include_router(auth_router)
+app.include_router(websocket_router)
 
 
 @app.get("/health")
