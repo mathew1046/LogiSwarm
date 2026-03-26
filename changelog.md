@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[061][4368297] fix(backend): add signal handling for graceful shutdown of agents and connections
+
 [060][c239910] fix(backend): add UTF-8 encoding support for cross-platform Windows compatibility
 
 [059][f430d56] style(frontend): implement full dark mode with CSS variables and user preference persistence

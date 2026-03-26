@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -7,6 +8,8 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.rate_limiter import llm_rate_limiter
 
 
 class MaxTokensWarningFilter(logging.Filter):
@@ -50,37 +53,90 @@ class ClaudeReasoningCore:
         model_name: str | None = None,
         max_tokens: int = 800,
         timeout_seconds: float = 30.0,
-        max_concurrent_calls: int = 5,
+        agent_id: str | None = None,
     ) -> None:
         configure_llm_logging_filter()
 
         self.api_key = api_key or os.getenv("LLM_API_KEY", "")
-        self.base_url = (base_url or os.getenv("LLM_BASE_URL", "https://api.anthropic.com")).rstrip("/")
+        self.base_url = (
+            base_url or os.getenv("LLM_BASE_URL", "https://api.anthropic.com")
+        ).rstrip("/")
         self.model_name = model_name or os.getenv("LLM_MODEL_NAME", "claude-sonnet-4-6")
         self.max_tokens = max_tokens
         self.timeout_seconds = timeout_seconds
+        self.agent_id = agent_id or "unknown"
 
-        configured_semaphore_size = int(
-            os.getenv("LLM_MAX_CONCURRENT_CALLS", str(max_concurrent_calls))
-        )
-        self._semaphore = _GlobalSemaphoreRegistry.get(configured_semaphore_size)
-
-    async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
+async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Convert feed + memory context into a structured disruption assessment."""
         if not self.api_key:
             return self._fallback_assessment(
                 reasoning="LLM_API_KEY is missing; returning fallback assessment."
             )
 
-        system_prompt = str(payload.get("system_prompt") or "You are a supply-chain risk analyst.")
-        events = payload.get("events") if isinstance(payload.get("events"), list) else []
+        acquired = await llm_rate_limiter.acquire(self.agent_id)
+        if not acquired:
+            return self._fallback_assessment(
+                reasoning="LLM call rate-limited; returning fallback assessment."
+            )
+
+        try:
+            use_fallback, model_to_use = llm_rate_limiter.should_use_fallback(self.model_name)
+            if use_fallback:
+                self.model_name = model_to_use
+
+            system_prompt = str(payload.get("system_prompt") or "You are a supply-chain risk analyst.")
+            events = payload.get("events") if isinstance(payload.get("events"), list) else []
+            memory_episodes = (
+                payload.get("memory_episodes")
+                if isinstance(payload.get("memory_episodes"), list)
+                else []
+            )
+
+            user_prompt = self._build_user_prompt(events=events, memory_episodes=memory_episodes)
+            started_at = time.perf_counter()
+
+            try:
+                response_payload = await self._call_messages_api(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                )
+                assessment = self._extract_tool_assessment(response_payload)
+                assessment_obj = DisruptionAssessment.model_validate(assessment)
+                result = assessment_obj.model_dump(mode="json")
+
+                elapsed_ms = (time.perf_counter() - started_at) * 1000
+                usage = response_payload.get("usage", {})
+                llm_rate_limiter.log_call(
+                    agent_id=self.agent_id,
+                    model=self.model_name,
+                    tokens_in=int(usage.get("input_tokens", 0)),
+                    tokens_out=int(usage.get("output_tokens", 0)),
+                    latency_ms=elapsed_ms,
+                    provider="anthropic",
+                )
+                return result
+            except Exception as exc:
+                return self._fallback_assessment(
+                    reasoning=f"LLM reasoning failed: {exc}",
+                )
+        finally:
+            llm_rate_limiter.release()
+
+        system_prompt = str(
+            payload.get("system_prompt") or "You are a supply-chain risk analyst."
+        )
+        events = (
+            payload.get("events") if isinstance(payload.get("events"), list) else []
+        )
         memory_episodes = (
             payload.get("memory_episodes")
             if isinstance(payload.get("memory_episodes"), list)
             else []
         )
 
-        user_prompt = self._build_user_prompt(events=events, memory_episodes=memory_episodes)
+        user_prompt = self._build_user_prompt(
+            events=events, memory_episodes=memory_episodes
+        )
         started_at = time.perf_counter()
 
         async with self._semaphore:
@@ -93,7 +149,9 @@ class ClaudeReasoningCore:
                 assessment_obj = DisruptionAssessment.model_validate(assessment)
                 result = assessment_obj.model_dump(mode="json")
 
-                self._log_usage(response_payload=response_payload, started_at=started_at)
+                self._log_usage(
+                    response_payload=response_payload, started_at=started_at
+                )
                 return result
             except Exception as exc:
                 return self._fallback_assessment(
@@ -195,57 +253,24 @@ class ClaudeReasoningCore:
         for block in content:
             if not isinstance(block, dict):
                 continue
-            if block.get("type") == "tool_use" and block.get("name") == "submit_assessment":
+            if (
+                block.get("type") == "tool_use"
+                and block.get("name") == "submit_assessment"
+            ):
                 tool_input = block.get("input")
                 if isinstance(tool_input, dict):
                     return tool_input
 
         raise ValueError("LLM did not return tool_use assessment")
 
-    def _log_usage(self, response_payload: dict[str, Any], started_at: float) -> None:
-        usage = response_payload.get("usage") if isinstance(response_payload.get("usage"), dict) else {}
-        input_tokens = int(usage.get("input_tokens", 0))
-        output_tokens = int(usage.get("output_tokens", 0))
-        latency_seconds = round(time.perf_counter() - started_at, 3)
-        estimated_cost = self._estimate_cost(input_tokens=input_tokens, output_tokens=output_tokens)
-
-        logging.getLogger("llm").info(
-            "llm_call model=%s input_tokens=%s output_tokens=%s latency_s=%s est_cost_usd=%.6f",
-            self.model_name,
-            input_tokens,
-            output_tokens,
-            latency_seconds,
-            estimated_cost,
-        )
-
-    def _estimate_cost(self, input_tokens: int, output_tokens: int) -> float:
-        return (
-            (input_tokens / 1_000_000) * self._INPUT_COST_PER_M_TOKENS
-            + (output_tokens / 1_000_000) * self._OUTPUT_COST_PER_M_TOKENS
-        )
-
-    @staticmethod
-    def _fallback_assessment(reasoning: str) -> dict[str, Any]:
-        assessment = DisruptionAssessment(
-            disruption_probability=0.0,
-            severity="LOW",
-            affected_routes=[],
-            recommended_actions=[],
-            confidence=0.0,
-            reasoning=reasoning,
-        )
-        return assessment.model_dump(mode="json")
-
-
-class _GlobalSemaphoreRegistry:
-    """Process-wide semaphore registry to enforce shared LLM concurrency limits."""
-
-    _semaphores: dict[int, asyncio.Semaphore] = {}
-
-    @classmethod
-    def get(cls, size: int) -> asyncio.Semaphore:
-        if size <= 0:
-            size = 1
-        if size not in cls._semaphores:
-            cls._semaphores[size] = asyncio.Semaphore(size)
-        return cls._semaphores[size]
+@staticmethod
+def _fallback_assessment(reasoning: str) -> dict[str, Any]:
+    assessment = DisruptionAssessment(
+        disruption_probability=0.0,
+        severity="LOW",
+        affected_routes=[],
+        recommended_actions=[],
+        confidence=0.0,
+        reasoning=reasoning,
+    )
+    return assessment.model_dump(mode="json")
