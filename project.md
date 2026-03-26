@@ -25,7 +25,7 @@
 
 ## Implementation Status
 
-**Overall:** 82/100 tasks complete · Phase 8 in progress
+**Overall:** 83/100 tasks complete · Phase 8 in progress
 
 | Phase | Tasks | Status | Complete |
 |---|---|---|---|
@@ -37,8 +37,8 @@
 | 5 — Backend API | 037–043 | ✅ Complete | 7/7 |
 | 6 — Frontend | 044–058 | ✅ Complete | 15/15 |
 | 7 — Polish | 059–072 | ✅ Complete | 14/14 |
-| 8 — Advanced | 073–100 | 🔵 In progress | 10/28 |
+| 8 — Advanced | 073–100 | 🔵 In progress | 11/28 |
 
-**Last completed task:** Task 080 — Bulk Shipment CSV Import
-**Next task:** Task 081 — Role-Based Access Control (RBAC)
+**Last completed task:** Task 081 — Role-Based Access Control (RBAC)
+**Next task:** Task 083 — WebSocket Support
 **Blockers:** None

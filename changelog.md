@@ -1,7 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
-[080][c9e9d69] feat(api): add bulk shipment CSV import with validation and background risk assessment
+[081][795ea3e] feat(auth): implement JWT-based RBAC with viewer/operator/admin roles
+[080][5ae2c53] feat(api): add bulk shipment CSV import with validation and background risk assessment
 [079][7812e70] feat(backend): add dual LLM configuration with primary/fallback auto-switching
 [078][47cbfcf] feat(agents): add anomaly detection tuning API with adaptive threshold adjustment
 [077][0a4ac91] feat(agents): implement dynamic graph memory update on disruption resolution

@@ -11,6 +11,7 @@ from app.db.models import (
     ShipmentRecord,
     VesselPosition,
 )
+from app.db.user_models import User
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "DecisionLog",
     "Route",
     "Report",
+    "User",
 ]

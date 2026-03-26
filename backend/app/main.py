@@ -35,6 +35,7 @@ from app.api import (
     actions_router,
     agents_router,
     anomaly_router,
+    auth_router,
     disruptions_router,
     feeds_router,
     metrics_router,
@@ -171,6 +172,7 @@ app.include_router(metrics_router)
 app.include_router(recommendations_router)
 app.include_router(disruptions_router)
 app.include_router(anomaly_router)
+app.include_router(auth_router)
 
 
 @app.get("/health")
