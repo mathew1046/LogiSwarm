@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import time
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,8 +40,11 @@ class DisruptionAssessment(BaseModel):
     reasoning: str
 
 
+LLMMode = Literal["primary", "fallback"]
+
+
 class ClaudeReasoningCore:
-    """Anthropic Claude-powered reasoning engine with tool-use JSON output."""
+    """Anthropic Claude-powered reasoning engine with dual LLM configuration."""
 
     _INPUT_COST_PER_M_TOKENS = 3.0
     _OUTPUT_COST_PER_M_TOKENS = 15.0
@@ -54,19 +57,35 @@ class ClaudeReasoningCore:
         max_tokens: int = 800,
         timeout_seconds: float = 30.0,
         agent_id: str | None = None,
+        mode: LLMMode = "primary",
     ) -> None:
         configure_llm_logging_filter()
 
-        self.api_key = api_key or os.getenv("LLM_API_KEY", "")
-        self.base_url = (
-            base_url or os.getenv("LLM_BASE_URL", "https://api.anthropic.com")
-        ).rstrip("/")
-        self.model_name = model_name or os.getenv("LLM_MODEL_NAME", "claude-sonnet-4-6")
+        self.mode = mode
         self.max_tokens = max_tokens
         self.timeout_seconds = timeout_seconds
         self.agent_id = agent_id or "unknown"
 
-async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if mode == "primary":
+            config = llm_rate_limiter.get_primary_config()
+            self.api_key = api_key or config.api_key or os.getenv("LLM_API_KEY", "")
+            self.base_url = (base_url or config.base_url).rstrip("/")
+            self.model_name = model_name or config.model_name
+        else:
+            config = llm_rate_limiter.get_fallback_config()
+            self.api_key = api_key or config.api_key or os.getenv("LLM_API_KEY", "")
+            self.base_url = (base_url or config.base_url).rstrip("/")
+            self.model_name = model_name or config.model_name
+
+        self._fallback_timeout_seconds = float(
+            os.getenv("LLM_FALLBACK_TIMEOUT_SECONDS", "10.0")
+        )
+
+    async def reason(
+        self,
+        payload: dict[str, Any],
+        use_fallback_on_error: bool = True,
+    ) -> dict[str, Any]:
         """Convert feed + memory context into a structured disruption assessment."""
         if not self.api_key:
             return self._fallback_assessment(
@@ -80,25 +99,33 @@ async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
             )
 
         try:
-            use_fallback, model_to_use = llm_rate_limiter.should_use_fallback(self.model_name)
-            if use_fallback:
-                self.model_name = model_to_use
+            use_fallback, model_to_use = llm_rate_limiter.should_use_fallback(
+                self.model_name
+            )
+            current_mode = "fallback" if use_fallback else self.mode
 
-            system_prompt = str(payload.get("system_prompt") or "You are a supply-chain risk analyst.")
-            events = payload.get("events") if isinstance(payload.get("events"), list) else []
+            system_prompt = str(
+                payload.get("system_prompt") or "You are a supply-chain risk analyst."
+            )
+            events = (
+                payload.get("events") if isinstance(payload.get("events"), list) else []
+            )
             memory_episodes = (
                 payload.get("memory_episodes")
                 if isinstance(payload.get("memory_episodes"), list)
                 else []
             )
 
-            user_prompt = self._build_user_prompt(events=events, memory_episodes=memory_episodes)
+            user_prompt = self._build_user_prompt(
+                events=events, memory_episodes=memory_episodes
+            )
             started_at = time.perf_counter()
 
             try:
                 response_payload = await self._call_messages_api(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
+                    model_override=model_to_use if use_fallback else None,
                 )
                 assessment = self._extract_tool_assessment(response_payload)
                 assessment_obj = DisruptionAssessment.model_validate(assessment)
@@ -108,70 +135,117 @@ async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
                 usage = response_payload.get("usage", {})
                 llm_rate_limiter.log_call(
                     agent_id=self.agent_id,
-                    model=self.model_name,
+                    model=model_to_use if use_fallback else self.model_name,
                     tokens_in=int(usage.get("input_tokens", 0)),
                     tokens_out=int(usage.get("output_tokens", 0)),
                     latency_ms=elapsed_ms,
                     provider="anthropic",
+                    model_type=current_mode,
+                    fallback_used=use_fallback,
                 )
                 return result
+
+            except httpx.HTTPStatusError as exc:
+                if (
+                    use_fallback_on_error
+                    and exc.response.status_code == 429
+                    and self.mode != "fallback"
+                ):
+                    llm_rate_limiter.mark_fallback_needed(
+                        reason="rate_limit_429",
+                        original_model=self.model_name,
+                    )
+                    return await self._call_with_fallback(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        started_at=started_at,
+                    )
+                return self._fallback_assessment(
+                    reasoning=f"LLM API error: {exc.response.status_code}"
+                )
+
+            except asyncio.TimeoutError:
+                if use_fallback_on_error and self.mode != "fallback":
+                    llm_rate_limiter.mark_fallback_needed(
+                        reason="timeout",
+                        original_model=self.model_name,
+                    )
+                    return await self._call_with_fallback(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        started_at=started_at,
+                    )
+                return self._fallback_assessment(reasoning="LLM call timed out")
+
             except Exception as exc:
                 return self._fallback_assessment(
-                    reasoning=f"LLM reasoning failed: {exc}",
+                    reasoning=f"LLM reasoning failed: {exc}"
                 )
+
         finally:
             llm_rate_limiter.release()
 
-        system_prompt = str(
-            payload.get("system_prompt") or "You are a supply-chain risk analyst."
-        )
-        events = (
-            payload.get("events") if isinstance(payload.get("events"), list) else []
-        )
-        memory_episodes = (
-            payload.get("memory_episodes")
-            if isinstance(payload.get("memory_episodes"), list)
-            else []
-        )
+    async def _call_with_fallback(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        started_at: float,
+    ) -> dict[str, Any]:
+        """Retry the LLM call with the fallback model."""
+        fallback_config = llm_rate_limiter.get_fallback_config()
 
-        user_prompt = self._build_user_prompt(
-            events=events, memory_episodes=memory_episodes
-        )
-        started_at = time.perf_counter()
+        try:
+            response_payload = await self._call_messages_api(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                api_key=fallback_config.api_key,
+                base_url=fallback_config.base_url,
+                model_override=fallback_config.model_name,
+            )
+            assessment = self._extract_tool_assessment(response_payload)
+            assessment_obj = DisruptionAssessment.model_validate(assessment)
+            result = assessment_obj.model_dump(mode="json")
 
-        async with self._semaphore:
-            try:
-                response_payload = await self._call_messages_api(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                )
-                assessment = self._extract_tool_assessment(response_payload)
-                assessment_obj = DisruptionAssessment.model_validate(assessment)
-                result = assessment_obj.model_dump(mode="json")
+            elapsed_ms = (time.perf_counter() - started_at) * 1000
+            usage = response_payload.get("usage", {})
+            llm_rate_limiter.log_call(
+                agent_id=self.agent_id,
+                model=fallback_config.model_name,
+                tokens_in=int(usage.get("input_tokens", 0)),
+                tokens_out=int(usage.get("output_tokens", 0)),
+                latency_ms=elapsed_ms,
+                provider="anthropic",
+                model_type="fallback",
+                fallback_used=True,
+            )
+            return result
 
-                self._log_usage(
-                    response_payload=response_payload, started_at=started_at
-                )
-                return result
-            except Exception as exc:
-                return self._fallback_assessment(
-                    reasoning=f"LLM reasoning failed: {exc}",
-                )
+        except Exception as exc:
+            return self._fallback_assessment(
+                reasoning=f"Fallback LLM call failed: {exc}"
+            )
 
     async def _call_messages_api(
         self,
         system_prompt: str,
         user_prompt: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model_override: str | None = None,
     ) -> dict[str, Any]:
-        endpoint = f"{self.base_url}/v1/messages"
+        effective_api_key = api_key or self.api_key
+        effective_base_url = (base_url or self.base_url).rstrip("/")
+        effective_model = model_override or self.model_name
+
+        endpoint = f"{effective_base_url}/v1/messages"
         headers = {
             "Content-Type": "application/json",
-            "x-api-key": self.api_key,
+            "x-api-key": effective_api_key,
             "anthropic-version": "2023-06-01",
         }
 
         payload = {
-            "model": self.model_name,
+            "model": effective_model,
             "max_tokens": self.max_tokens,
             "system": system_prompt,
             "messages": [
@@ -226,7 +300,14 @@ async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
             "tool_choice": {"type": "tool", "name": "submit_assessment"},
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+        timeout = max(
+            self.timeout_seconds,
+            llm_rate_limiter.fallback_timeout_seconds
+            if model_override
+            else self.timeout_seconds,
+        )
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
@@ -263,14 +344,14 @@ async def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
 
         raise ValueError("LLM did not return tool_use assessment")
 
-@staticmethod
-def _fallback_assessment(reasoning: str) -> dict[str, Any]:
-    assessment = DisruptionAssessment(
-        disruption_probability=0.0,
-        severity="LOW",
-        affected_routes=[],
-        recommended_actions=[],
-        confidence=0.0,
-        reasoning=reasoning,
-    )
-    return assessment.model_dump(mode="json")
+    @staticmethod
+    def _fallback_assessment(reasoning: str) -> dict[str, Any]:
+        assessment = DisruptionAssessment(
+            disruption_probability=0.0,
+            severity="LOW",
+            affected_routes=[],
+            recommended_actions=[],
+            confidence=0.0,
+            reasoning=reasoning,
+        )
+        return assessment.model_dump(mode="json")
