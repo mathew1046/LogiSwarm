@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import hashlib
+import io
 import json
 import os
 from datetime import UTC, datetime
@@ -30,6 +33,19 @@ class MemoryEpisode(BaseModel):
     content: str
     metadata: EpisodeMetadata
     created_at: datetime
+    content_hash: str = ""
+
+
+class SeedMemoryResult(BaseModel):
+    """Result of seeding agent memory from uploaded data."""
+
+    model_config = ConfigDict(extra="allow")
+
+    region_id: str
+    episodes_seeded: int
+    episodes_skipped: int
+    episodes_total: int
+    errors: list[str] = Field(default_factory=list)
 
 
 class ZepEpisodicMemory:
@@ -43,7 +59,9 @@ class ZepEpisodicMemory:
         timeout_seconds: float = 20.0,
     ) -> None:
         self.api_key = api_key or os.getenv("ZEP_API_KEY", "")
-        self.base_url = (base_url or os.getenv("ZEP_BASE_URL", "https://api.getzep.com")).rstrip("/")
+        self.base_url = (
+            base_url or os.getenv("ZEP_BASE_URL", "https://api.getzep.com")
+        ).rstrip("/")
         self.collection_name = collection_name
         self.timeout_seconds = timeout_seconds
 
@@ -144,6 +162,154 @@ class ZepEpisodicMemory:
 
         return inserted
 
+    async def seed_memory_from_data(
+        self,
+        region_id: str,
+        data: str,
+        data_format: str = "json",
+    ) -> SeedMemoryResult:
+        """
+        Seed agent memory from uploaded CSV or JSON data.
+
+        CSV format: date, event_type, severity, duration_hours, resolution_summary
+        JSON format: list of objects with same fields or standard episode fields.
+
+        Prevents duplicate seeding by checking content hash.
+        """
+        data_format = data_format.lower().strip()
+        rows: list[dict[str, Any]] = []
+
+        if data_format == "csv":
+            rows = self._parse_csv_data(data)
+        elif data_format == "json":
+            rows = self._parse_json_data(data)
+        else:
+            return SeedMemoryResult(
+                region_id=region_id,
+                episodes_seeded=0,
+                episodes_skipped=0,
+                episodes_total=0,
+                errors=[f"Unsupported format '{data_format}'. Use 'csv' or 'json'."],
+            )
+
+        episodes_seeded = 0
+        episodes_skipped = 0
+        errors: list[str] = []
+
+        for idx, row in enumerate(rows):
+            try:
+                processed = self._normalize_seed_row(row, row_num=idx + 1)
+                content_hash = self._compute_content_hash(
+                    region_id=region_id,
+                    summary=processed["summary"],
+                    event_date=processed.get("date", ""),
+                )
+
+                existing = [
+                    ep
+                    for ep in self._local_episodes
+                    if ep.content_hash == content_hash
+                    and ep.metadata.region_id == region_id
+                ]
+                if existing:
+                    episodes_skipped += 1
+                    continue
+
+                await self.write_resolved_episode(
+                    region_id=region_id,
+                    severity=processed["severity"],
+                    duration_hours=processed["duration_hours"],
+                    resolution=processed["resolution"],
+                    episode_summary=processed["summary"],
+                )
+
+                if self._local_episodes:
+                    last_episode = self._local_episodes[-1]
+                    last_episode.content_hash = content_hash
+
+                episodes_seeded += 1
+            except Exception as exc:
+                errors.append(f"Row {idx + 1}: {str(exc)}")
+
+        return SeedMemoryResult(
+            region_id=region_id,
+            episodes_seeded=episodes_seeded,
+            episodes_skipped=episodes_skipped,
+            episodes_total=len(rows),
+            errors=errors,
+        )
+
+    def _parse_csv_data(self, data: str) -> list[dict[str, Any]]:
+        """Parse CSV string into list of row dictionaries."""
+        rows: list[dict[str, Any]] = []
+        reader = csv.DictReader(io.StringIO(data.strip()))
+        for row in reader:
+            rows.append(dict(row))
+        return rows
+
+    def _parse_json_data(self, data: str) -> list[dict[str, Any]]:
+        """Parse JSON string into list of row dictionaries."""
+        payload = json.loads(data.strip())
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict):
+            if "episodes" in payload and isinstance(payload["episodes"], list):
+                return [item for item in payload["episodes"] if isinstance(item, dict)]
+            if "data" in payload and isinstance(payload["data"], list):
+                return [item for item in payload["data"] if isinstance(item, dict)]
+            return [payload]
+        return []
+
+    def _normalize_seed_row(self, row: dict[str, Any], row_num: int) -> dict[str, Any]:
+        """Normalize a seed row to standard episode fields."""
+        severity = str(
+            row.get("severity") or row.get("event_severity") or "MEDIUM"
+        ).upper()
+
+        if severity not in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}:
+            severity = "MEDIUM"
+
+        duration_str = row.get("duration_hours") or row.get("duration") or "0"
+        try:
+            duration_hours = float(duration_str)
+        except (TypeError, ValueError):
+            duration_hours = 0.0
+
+        summary = str(
+            row.get("resolution_summary")
+            or row.get("summary")
+            or row.get("event")
+            or row.get("episode_summary")
+            or row.get("description")
+            or f"Disruption event {row_num}"
+        )
+
+        if not summary.strip():
+            summary = f"Disruption event {row_num}"
+
+        resolution = str(
+            row.get("resolution")
+            or row.get("outcome")
+            or row.get("resolution_summary")
+            or "Resolved"
+        )
+
+        event_date = str(row.get("date") or row.get("event_date") or "")
+
+        return {
+            "severity": severity,
+            "duration_hours": duration_hours,
+            "summary": summary,
+            "resolution": resolution,
+            "date": event_date,
+        }
+
+    @staticmethod
+    def _compute_content_hash(region_id: str, summary: str, event_date: str) -> str:
+        """Generate a deterministic hash for duplicate detection."""
+        canonical = f"{region_id}|{event_date}|{summary.strip().lower()}"
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
     async def _zep_create_document(self, episode: MemoryEpisode) -> None:
         if not self.api_key:
             return
@@ -201,7 +367,9 @@ class ZepEpisodicMemory:
             if not isinstance(item, dict):
                 continue
 
-            metadata_raw = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            metadata_raw = (
+                item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            )
             created_at_raw = metadata_raw.get("created_at") or item.get("created_at")
             created_at = self._parse_datetime(created_at_raw)
 
@@ -210,7 +378,11 @@ class ZepEpisodicMemory:
                 continue
 
             episode = MemoryEpisode(
-                episode_id=str(item.get("document_id") or item.get("id") or self._new_episode_id(region_id)),
+                episode_id=str(
+                    item.get("document_id")
+                    or item.get("id")
+                    or self._new_episode_id(region_id)
+                ),
                 content=content,
                 metadata=EpisodeMetadata(
                     region_id=str(metadata_raw.get("region_id") or region_id),
@@ -224,7 +396,9 @@ class ZepEpisodicMemory:
 
         return episodes[:top_k]
 
-    def _search_local(self, region_id: str, query: str, top_k: int) -> list[MemoryEpisode]:
+    def _search_local(
+        self, region_id: str, query: str, top_k: int
+    ) -> list[MemoryEpisode]:
         query_terms = self._tokenize(query)
         if not query_terms:
             return [
@@ -249,7 +423,9 @@ class ZepEpisodicMemory:
         scored.sort(key=lambda item: (item[0], item[1].created_at), reverse=True)
         return [episode for _, episode in scored[:top_k]]
 
-    async def _load_seed_dataset(self, dataset_path: str | None) -> list[dict[str, Any]]:
+    async def _load_seed_dataset(
+        self, dataset_path: str | None
+    ) -> list[dict[str, Any]]:
         path = dataset_path or os.getenv("HISTORICAL_DISRUPTIONS_JSON", "")
         if path:
             rows = await asyncio.to_thread(self._read_json_file, path)

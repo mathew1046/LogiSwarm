@@ -25,7 +25,7 @@
 
 ## Implementation Status
 
-**Overall:** 77/100 tasks complete · Phase 8 in progress
+**Overall:** 78/100 tasks complete · Phase 8 in progress
 
 | Phase | Tasks | Status | Complete |
 |---|---|---|---|
@@ -37,8 +37,8 @@
 | 5 — Backend API | 037–043 | ✅ Complete | 7/7 |
 | 6 — Frontend | 044–058 | ✅ Complete | 15/15 |
 | 7 — Polish | 059–072 | ✅ Complete | 14/14 |
-| 8 — Advanced | 073–100 | 🔵 In progress | 5/28 |
+| 8 — Advanced | 073–100 | 🔵 In progress | 6/28 |
 
-**Last completed task:** Task 075 — Inventory Buffer Recommendations
-**Next task:** Task 076 — Agent Memory Seeding from CSV/JSON
+**Last completed task:** Task 076 — Agent Memory Seeding from CSV/JSON
+**Next task:** Task 077 — Dynamic Graph Memory Update
 **Blockers:** None

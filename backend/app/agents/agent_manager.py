@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -8,12 +9,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents.base_agent import GeoAgent
 from app.agents.llm_core import ClaudeReasoningCore
-from app.agents.memory import ZepEpisodicMemory
+from app.agents.memory import SeedMemoryResult, ZepEpisodicMemory
 from app.agents.regions.china_ea_agent import ChinaEastAsiaGeoAgent
 from app.agents.regions.europe_agent import EuropeGeoAgent
 from app.agents.regions.gulf_suez_agent import GulfSuezGeoAgent
 from app.agents.regions.north_america_agent import NorthAmericaGeoAgent
 from app.agents.regions.se_asia_agent import SEAsiaGeoAgent
+
+logger = logging.getLogger(__name__)
 
 
 NEIGHBOR_MAP: dict[str, list[str]] = {
@@ -212,6 +215,25 @@ agent_manager = AgentManager()
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
+class SeedMemoryRequest(BaseModel):
+    """Request body for seeding agent memory from uploaded data."""
+
+    data: str = Field(min_length=1, description="CSV or JSON data string")
+    format: str = Field(default="json", description="Data format: 'csv' or 'json'")
+
+
+class SeedMemoryResponse(BaseModel):
+    """Response for agent memory seeding operation."""
+
+    model_config = ConfigDict(extra="allow")
+
+    region_id: str
+    episodes_seeded: int
+    episodes_skipped: int
+    episodes_total: int
+    errors: list[str] = Field(default_factory=list)
+
+
 @router.get("", response_model=Envelope)
 async def list_agents() -> Envelope:
     return Envelope(
@@ -267,3 +289,43 @@ async def force_assess(region_id: str) -> Envelope:
             status_code=404, detail=f"Agent '{region_id}' not found"
         ) from None
     return Envelope(data=payload, error=None, meta=None)
+
+
+@router.post("/{region_id}/seed-memory", response_model=SeedMemoryResponse)
+async def seed_agent_memory(
+    region_id: str, payload: SeedMemoryRequest
+) -> SeedMemoryResponse:
+    """Seed agent episodic memory from CSV or JSON data upload."""
+    try:
+        agent_manager.get_agent(region_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
+
+    data_format = payload.format.lower().strip()
+    if data_format not in {"csv", "json"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid format '{payload.format}'. Must be 'csv' or 'json'.",
+        )
+
+    zep_client = ZepEpisodicMemory()
+    result = await zep_client.seed_memory_from_data(
+        region_id=region_id,
+        data=payload.data,
+        data_format=data_format,
+    )
+
+    logger.info(
+        f"Seeded {result.episodes_seeded} episodes into agent memory for region {region_id} "
+        f"(skipped {result.episodes_skipped} duplicates)"
+    )
+
+    return SeedMemoryResponse(
+        region_id=result.region_id,
+        episodes_seeded=result.episodes_seeded,
+        episodes_skipped=result.episodes_skipped,
+        episodes_total=result.episodes_total,
+        errors=result.errors,
+    )

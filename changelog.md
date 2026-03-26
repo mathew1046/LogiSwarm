@@ -1,7 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
-[075][1985915] feat(orchestrator): add inventory buffer recommendation engine for upstream planning
+[076][12f681c] feat(agents): add CSV/JSON memory seeding endpoint for historical disruption data upload
+[075][655b4ea] feat(orchestrator): add inventory buffer recommendation engine for upstream planning
 [074][4112301] feat(orchestrator): add predictive ETA recalculation for affected shipments on disruption
 [073][2b80e2c] feat(routes): extend optimizer with multi-modal sea/air/rail graph and handoff nodes
 [082][08aa2aa] feat(ops): add Prometheus metrics endpoint with per-region agent and LLM metrics
