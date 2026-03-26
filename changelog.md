@@ -1,11 +1,14 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[073][2b80e2c] feat(routes): extend optimizer with multi-modal sea/air/rail graph and handoff nodes
+[082][08aa2aa] feat(ops): add Prometheus metrics endpoint with per-region agent and LLM metrics
+[095][ccaa528] chore(legal): add AGPL-3.0 license and third-party attribution notices
+[096][c498bb0] feat(docker): add multi-stage production Docker builds with Nginx frontend serving
+
 [072][1fc350c] feat(demo): add seed script and one-command demo with Suez 2021 simulation scenario
 
 [071][fcf2af7] docs(readme): add comprehensive README with architecture, setup, and API documentation
-
-[070][1ec31fe] ci: add GitHub Actions pipeline with lint, test, build, and deploy stages
 
 [062][7b1573d] feat(backend): add LLM semaphore and rate limiting with cost guard and usage logging
 
