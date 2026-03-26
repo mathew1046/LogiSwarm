@@ -32,7 +32,9 @@ from app.api import (
     sse_router,
 )
 from app.bus.connection import close_redis_pool, init_redis_pool
+from app.db.session import engine
 from app.orchestrator.orchestrator import swarm_orchestrator
+from app.shutdown import register_shutdown_handler, setup_signal_handlers
 
 
 class MaxTokensWarningFilter(logging.Filter):
@@ -172,6 +174,9 @@ def _log_dependency_health() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.bind(event="startup").info("Starting backend service")
+
+    setup_signal_handlers()
+
     await init_redis_pool()
     logger.bind(event="startup").info("Redis connection pool initialized")
     await agent_manager.start_all()
@@ -180,14 +185,32 @@ async def lifespan(app: FastAPI):
     logger.bind(event="startup").info("Swarm orchestrator started")
     _log_registered_routes(app)
     _log_dependency_health()
+
     yield
+
+    await graceful_shutdown_app()
+
+
+async def graceful_shutdown_app() -> None:
+    logger.bind(event="shutdown").info("Initiating application shutdown")
+
+    logger.bind(event="shutdown").info("Stopping swarm orchestrator")
     await swarm_orchestrator.stop()
     logger.bind(event="shutdown").info("Swarm orchestrator stopped")
+
+    logger.bind(event="shutdown").info("Stopping geo-agents")
     await agent_manager.stop_all()
     logger.bind(event="shutdown").info("Geo-agent manager stopped")
+
+    logger.bind(event="shutdown").info("Closing Redis connection pool")
     await close_redis_pool()
     logger.bind(event="shutdown").info("Redis connection pool closed")
-    logger.bind(event="shutdown").info("Shutting down backend service")
+
+    logger.bind(event="shutdown").info("Closing database engine")
+    await engine.dispose()
+    logger.bind(event="shutdown").info("Database engine closed")
+
+    logger.bind(event="shutdown").info("Backend service shutdown complete")
 
 
 configure_logging()

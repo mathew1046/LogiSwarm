@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[060][c239910] fix(backend): add UTF-8 encoding support for cross-platform Windows compatibility
+
 [059][f430d56] style(frontend): implement full dark mode with CSS variables and user preference persistence
 
 [058][bf27e8e] feat(frontend): implement history database viewer with expandable cards
