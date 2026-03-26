@@ -1,6 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[064][0d2e490] fix(config): environment variables take precedence over .env for deployment flexibility
+
 [063][d4c1629] fix(feeds): handle non-UTF-8 encoded data files with automatic encoding detection
 
 [062][7b1573d] feat(backend): add LLM semaphore and rate limiting with cost guard and usage logging
