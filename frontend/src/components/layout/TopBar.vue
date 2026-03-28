@@ -1,9 +1,10 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 import { useAlertStore } from '@/stores/alert'
 import { useThemeStore } from '@/stores/theme'
+import OnboardingTour from '@/components/common/OnboardingTour.vue'
 
 const router = useRouter()
 const projectStore = useProjectStore()
@@ -13,6 +14,9 @@ const themeStore = useThemeStore()
 const currentProject = computed(() => projectStore.currentProject)
 const unreadCount = computed(() => alertStore.unreadCount)
 const isDark = computed(() => themeStore.isDark())
+
+const tourRef = ref(null)
+const showTourButton = ref(false)
 
 function goToProjects() {
   router.push('/projects')
@@ -24,6 +28,17 @@ function getThemeIcon() {
   }
   return themeStore.preference === themeStore.THEMES.DARK ? 'dark' : 'light'
 }
+
+function startTour() {
+  if (tourRef.value) {
+    tourRef.value.startTour()
+  }
+}
+
+onMounted(() => {
+  const completed = localStorage.getItem('logiswarm_onboarding_completed')
+  showTourButton.value = completed === 'true'
+})
 </script>
 
 <template>
@@ -47,6 +62,19 @@ function getThemeIcon() {
     </div>
     
     <div class="topbar-right">
+      <button 
+        v-if="showTourButton"
+        class="btn btn--ghost btn--sm tour-btn"
+        @click="startTour"
+        title="Take a tour"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+          <path d="M12 17h.01"/>
+        </svg>
+      </button>
+      
       <button 
         class="btn btn--secondary btn--sm theme-toggle" 
         @click="themeStore.cycleTheme"
@@ -72,10 +100,20 @@ function getThemeIcon() {
         <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
       </button>
     </div>
+    
+    <OnboardingTour ref="tourRef" />
   </header>
 </template>
 
 <style scoped>
+.tour-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2);
+  min-width: 36px;
+}
+
 .theme-toggle {
   padding: var(--spacing-2);
   min-width: 36px;
