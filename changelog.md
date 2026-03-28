@@ -1,6 +1,7 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[096][3cb79f7] feat(docker): add multi-stage production Docker builds with Nginx frontend serving
 [095][38f56ec] chore(legal): add AGPL-3.0 license and third-party attribution notices
 [094][4bff805] feat(frontend): add onboarding tour with driver.js for first-time user guidance
 [093][ccc90fe] feat(frontend): add analytics dashboard with disruption history and performance charts
