@@ -16,7 +16,7 @@ from app.bus.channels import alert_channel, broadcast_channel
 from app.bus.connection import get_redis_client
 from app.bus.publisher import publish
 from app.bus.subscriber import subscribe
-from app.feeds.aggregator import Event, FeedAggregator
+from app.feeds.aggregator import DegradationStatus, Event, FeedAggregator
 
 if TYPE_CHECKING:
     from app.agents.memory import MemoryEpisode
@@ -24,6 +24,31 @@ if TYPE_CHECKING:
 
 Decision = dict[str, Any]
 LlmReasonCallable = Callable[[dict[str, Any]], Awaitable[Decision] | Decision]
+
+
+class PerceptionResult:
+    """Result of the perception step including degradation status."""
+
+    def __init__(
+        self,
+        events: list[Event],
+        degradation_status: DegradationStatus | None = None,
+    ) -> None:
+        self.events = events
+        self.degradation_status = degradation_status
+
+    @property
+    def is_degraded(self) -> bool:
+        return (
+            self.degradation_status is not None
+            and self.degradation_status.mode != "NORMAL"
+        )
+
+    @property
+    def uncertainty_factor(self) -> float:
+        if self.degradation_status is None:
+            return 0.0
+        return self.degradation_status.uncertainty_factor
 
 
 class GeoAgent(ABC):
@@ -59,6 +84,7 @@ class GeoAgent(ABC):
         self.last_events: list[Event] = []
         self.last_decision: Decision | None = None
         self.last_cycle_at: datetime | None = None
+        self.last_degradation_status: DegradationStatus | None = None
         self.neighbor_region_ids: list[str] = []
         self._incoming_neighbor_signals: list[dict[str, Any]] = []
 
@@ -66,28 +92,58 @@ class GeoAgent(ABC):
     def get_system_prompt(self) -> str:
         """Return region-specific system instructions for reasoning."""
 
-    async def perceive(self, lookback_minutes: int = 60) -> list[Event]:
-        """Fetch normalized events for this region using the feed aggregator."""
-        events = await self.aggregator.get_region_events(
+    async def perceive(self, lookback_minutes: int = 60) -> PerceptionResult:
+        """Fetch normalized events for this region using the feed aggregator.
+
+        Returns a PerceptionResult containing events and degradation status.
+        In DEGRADED/OFFLINE mode, uses cached data with uncertainty flagging.
+        """
+        events, is_degraded = await self.aggregator.get_region_events(
             region_id=self.region_id,
             lookback_minutes=lookback_minutes,
         )
         events.extend(self._neighbor_signal_events())
         self.last_events = events
-        return events
 
-    async def reason(self, events: list[Event]) -> Decision:
-        """Run LLM reasoning over current events and memory context."""
+        if is_degraded:
+            self.last_degradation_status = await self.aggregator.get_degradation_status(
+                self.region_id
+            )
+        else:
+            self.last_degradation_status = None
+
+        return PerceptionResult(
+            events=events,
+            degradation_status=self.last_degradation_status,
+        )
+
+    async def reason(
+        self, events: list[Event], perception_result: PerceptionResult | None = None
+    ) -> Decision:
+        """Run LLM reasoning over current events and memory context.
+
+        If operating in degraded/offline mode, adds uncertainty caveat and
+        reduces confidence scores to reflect data staleness.
+        """
         memory_episodes = await self._retrieve_memory_episodes(events)
         memory_lines = self._format_memory_lines(memory_episodes)
         recent_resolved_lines = self._recent_resolved_lines(memory_episodes)
         neighbor_alert_lines = self._neighbor_alert_lines()
+
+        degradation_caveat = None
+        uncertainty_factor = 0.0
+        if perception_result and perception_result.is_degraded:
+            degradation_caveat = self._build_degradation_caveat(
+                perception_result.degradation_status
+            )
+            uncertainty_factor = perception_result.uncertainty_factor
 
         dynamic_system_prompt = self.prompt_builder.build_prompt(
             base_prompt=self.get_system_prompt(),
             memory_lines=memory_lines,
             recent_resolved_lines=recent_resolved_lines,
             neighbor_alert_lines=neighbor_alert_lines,
+            degradation_caveat=degradation_caveat,
         )
 
         payload = {
@@ -98,6 +154,9 @@ class GeoAgent(ABC):
             "memory_episodes": [
                 self._episode_to_payload(episode) for episode in memory_episodes
             ],
+            "is_degraded": perception_result.is_degraded
+            if perception_result
+            else False,
         }
 
         if hasattr(self.llm_client, "reason"):
@@ -122,6 +181,28 @@ class GeoAgent(ABC):
                 "reasoning": "Invalid LLM decision format",
                 "raw": str(decision),
             }
+
+        if uncertainty_factor > 0:
+            original_confidence = float(decision.get("confidence", 0.5))
+            adjusted_confidence = original_confidence * (1 - uncertainty_factor)
+            decision["confidence"] = round(adjusted_confidence, 3)
+
+            original_reasoning = decision.get("reasoning", "")
+            stale_warning = (
+                f" [UNCERTAINTY WARNING: Operating on data from "
+                f"{perception_result.degradation_status.cached_data_age_minutes:.0f} minutes ago. "
+                f"Confidence reduced by {uncertainty_factor * 100:.0f}%]"
+            )
+            decision["reasoning"] = original_reasoning + stale_warning
+            decision["is_degraded"] = True
+            decision["degraded_connectors"] = (
+                perception_result.degradation_status.degraded_connectors
+                if perception_result.degradation_status
+                else []
+            )
+        else:
+            decision["is_degraded"] = False
+            decision["degraded_connectors"] = []
 
         decision.setdefault("region_id", self.region_id)
         decision.setdefault("region_name", self.region_name)
@@ -162,12 +243,14 @@ class GeoAgent(ABC):
 
     def set_neighbors(self, neighbor_region_ids: list[str]) -> None:
         """Configure neighboring regions used for cross-agent propagation."""
-        self.neighbor_region_ids = [region for region in neighbor_region_ids if region != self.region_id]
+        self.neighbor_region_ids = [
+            region for region in neighbor_region_ids if region != self.region_id
+        ]
 
     async def run_cycle(self) -> Decision:
         """Execute one complete perceive → reason → act cycle."""
-        events = await self.perceive()
-        decision = await self.reason(events)
+        perception_result = await self.perceive()
+        decision = await self.reason(perception_result.events, perception_result)
         await self.act(decision)
         self.last_cycle_at = datetime.now(UTC)
         return decision
@@ -245,6 +328,24 @@ class GeoAgent(ABC):
                 error=str(exc),
             )
 
+    def _build_degradation_caveat(self, degradation_status: DegradationStatus) -> str:
+        """Build a caveat string for degraded/offline mode."""
+        cached_age = (
+            degradation_status.cached_data_age_minutes
+            if degradation_status.cached_data_age_minutes
+            else 0
+        )
+        failed_connectors = (
+            ", ".join(degradation_status.degraded_connectors) or "unknown"
+        )
+        return (
+            f"DATA QUALITY WARNING: This region is operating in {degradation_status.mode} mode. "
+            f"The following data sources are unavailable: {failed_connectors}. "
+            f"Current analysis is based on data cached {cached_age:.0f} minutes ago. "
+            f"Treat confidence scores with increased uncertainty. "
+            f"Uncertainty factor: {degradation_status.uncertainty_factor * 100:.0f}%."
+        )
+
     def _neighbor_signal_events(self) -> list[Event]:
         if not self._incoming_neighbor_signals:
             return []
@@ -257,7 +358,9 @@ class GeoAgent(ABC):
 
         events: list[Event] = []
         for signal in signals:
-            timestamp = self._parse_datetime(signal.get("broadcast_at") or signal.get("received_at"))
+            timestamp = self._parse_datetime(
+                signal.get("broadcast_at") or signal.get("received_at")
+            )
             event_type = f"NEIGHBOR_ALERT_{str(signal.get('origin_region_id') or 'unknown').upper()}"
             events.append(
                 Event(
@@ -272,7 +375,9 @@ class GeoAgent(ABC):
             )
         return events
 
-    async def _retrieve_memory_episodes(self, events: list[Event]) -> list[MemoryEpisode]:
+    async def _retrieve_memory_episodes(
+        self, events: list[Event]
+    ) -> list[MemoryEpisode]:
         if not hasattr(self.zep_client, "search_similar_episodes"):
             return []
 
@@ -344,7 +449,10 @@ class GeoAgent(ABC):
     def _build_anomaly_description(events: list[Event]) -> str:
         if not events:
             return "No active event signals"
-        top_signals = [f"{event.source}:{event.event_type}:{event.severity}" for event in events[:6]]
+        top_signals = [
+            f"{event.source}:{event.event_type}:{event.severity}"
+            for event in events[:6]
+        ]
         return " | ".join(top_signals)
 
     @staticmethod

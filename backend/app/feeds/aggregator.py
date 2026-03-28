@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,6 +21,8 @@ DEFAULT_BBOX_BY_REGION: dict[str, tuple[float, float, float, float]] = {
     "north_america": (-130.0, 20.0, -60.0, 55.0),
     "china_ea": (100.0, 18.0, 145.0, 45.0),
 }
+
+OFFLINE_MULTIPLIER = 3
 
 
 SEVERITY_ORDER = {
@@ -67,6 +70,34 @@ class FeedHealth(BaseModel):
     poll_interval_seconds: int
 
 
+class DegradationStatus(BaseModel):
+    """Degradation status for a region's feed system."""
+
+    model_config = ConfigDict(extra="allow")
+
+    region_id: str
+    mode: str
+    all_connectors_failed: bool
+    failed_connector_count: int
+    total_connector_count: int
+    degraded_connectors: list[str]
+    last_successful_fetch: datetime | None
+    cached_data_age_minutes: float | None
+    uncertainty_factor: float
+
+
+class RegionDegradationState(BaseModel):
+    """Internal state tracking for region-level degradation."""
+
+    model_config = ConfigDict(extra="allow")
+
+    region_id: str
+    cached_events: list[Event] = Field(default_factory=list)
+    last_successful_global_fetch: datetime | None = None
+    consecutive_failures: dict[str, int] = Field(default_factory=dict)
+    connector_last_success: dict[str, datetime | None] = Field(default_factory=dict)
+
+
 class FeedAggregator:
     """Aggregate heterogeneous connector payloads into a single normalized event stream."""
 
@@ -82,38 +113,90 @@ class FeedAggregator:
         self.last_latency_ms_by_connector: dict[str, float | None] = {
             connector: None for connector in CONNECTOR_DEFAULT_POLL_INTERVALS
         }
+        self._region_degradation_states: dict[str, RegionDegradationState] = {}
 
     async def get_region_events(
         self,
         region_id: str,
         lookback_minutes: int = 60,
-    ) -> list[Event]:
-        """Collect, deduplicate, and sort region events across all feed connectors."""
+    ) -> tuple[list[Event], bool]:
+        """Collect, deduplicate, and sort region events across all feed connectors.
+
+        Returns a tuple of (events, is_degraded) where is_degraded indicates
+        whether the system is operating in offline fallback mode using cached data.
+        """
         bbox = self._resolve_bbox(region_id)
+        state = self._get_or_create_region_state(region_id)
+
+        connector_calls = [
+            ("ais", self._from_ais(bbox=bbox)),
+            ("weather", self._from_weather(region_id=region_id, bbox=bbox)),
+            ("port_simulator", self._from_port(region_id=region_id, bbox=bbox)),
+            ("carrier", self._from_carrier(region_id=region_id, bbox=bbox)),
+            ("gdelt", self._from_gdelt(region_id=region_id, bbox=bbox)),
+        ]
 
         source_results = await asyncio.gather(
-            self._from_ais(bbox=bbox),
-            self._from_weather(region_id=region_id, bbox=bbox),
-            self._from_port(region_id=region_id, bbox=bbox),
-            self._from_carrier(region_id=region_id, bbox=bbox),
-            self._from_gdelt(region_id=region_id, bbox=bbox),
+            *[call for _, call in connector_calls],
             return_exceptions=True,
         )
 
         merged: list[Event] = []
-        for result in source_results:
+        successful_connectors = 0
+        for (connector_name, _), result in zip(connector_calls, source_results):
             if isinstance(result, Exception):
+                state.consecutive_failures[connector_name] = (
+                    state.consecutive_failures.get(connector_name, 0) + 1
+                )
                 continue
+
             merged.extend(result)
+            successful_connectors += 1
+            state.consecutive_failures[connector_name] = 0
+            state.connector_last_success[connector_name] = datetime.now(UTC)
+
+        total_connectors = len(connector_calls)
+        all_failed = successful_connectors == 0
+        majority_failed = successful_connectors < (total_connectors // 2 + 1)
+
+        if all_failed and state.cached_events:
+            state.cached_events = self._filter_lookback(
+                state.cached_events,
+                lookback_minutes=lookback_minutes * OFFLINE_MULTIPLIER,
+            )
+            return (state.cached_events, True)
+
+        if successful_connectors > 0:
+            state.cached_events = merged.copy() if merged else state.cached_events
+            if not all_failed:
+                state.last_successful_global_fetch = datetime.now(UTC)
+
+        if majority_failed and state.cached_events:
+            merged = self._merge_with_cache(merged, state.cached_events)
+            deduped = self._dedupe(merged)
+            filtered = self._filter_lookback(deduped, lookback_minutes=lookback_minutes)
+            return (
+                sorted(
+                    filtered,
+                    key=lambda event: (
+                        -SEVERITY_ORDER.get(event.severity.upper(), 0),
+                        -event.timestamp.timestamp(),
+                    ),
+                ),
+                True,
+            )
 
         deduped = self._dedupe(merged)
         filtered = self._filter_lookback(deduped, lookback_minutes=lookback_minutes)
-        return sorted(
-            filtered,
-            key=lambda event: (
-                -SEVERITY_ORDER.get(event.severity.upper(), 0),
-                -event.timestamp.timestamp(),
+        return (
+            sorted(
+                filtered,
+                key=lambda event: (
+                    -SEVERITY_ORDER.get(event.severity.upper(), 0),
+                    -event.timestamp.timestamp(),
+                ),
             ),
+            False,
         )
 
     async def get_connectors_health(
@@ -158,7 +241,9 @@ class FeedAggregator:
                 poll_interval_seconds=poll_interval_seconds,
             )
 
-            event_count_last_hour = len([event for event in events if event.timestamp >= cutoff])
+            event_count_last_hour = len(
+                [event for event in events if event.timestamp >= cutoff]
+            )
             health.append(
                 FeedHealth(
                     connector=connector,
@@ -171,6 +256,115 @@ class FeedAggregator:
             )
 
         return health
+
+    async def get_degradation_status(self, region_id: str) -> DegradationStatus:
+        """Return the current degradation status for a region's feed system."""
+        state = self._get_or_create_region_state(region_id)
+        total_connectors = len(CONNECTOR_DEFAULT_POLL_INTERVALS)
+
+        degraded_connectors = []
+        for connector_name in CONNECTOR_DEFAULT_POLL_INTERVALS:
+            poll_interval = self._poll_interval_seconds(connector_name)
+            failure_threshold = poll_interval * OFFLINE_MULTIPLIER
+            consecutive_failures = state.consecutive_failures.get(connector_name, 0)
+            last_success = state.connector_last_success.get(connector_name)
+
+            if last_success is None:
+                if consecutive_failures > 0:
+                    degraded_connectors.append(connector_name)
+            else:
+                seconds_since_success = (
+                    datetime.now(UTC) - last_success
+                ).total_seconds()
+                if (
+                    seconds_since_success > failure_threshold
+                    or consecutive_failures >= 3
+                ):
+                    degraded_connectors.append(connector_name)
+
+        all_connectors_failed = len(degraded_connectors) == total_connectors
+
+        cached_data_age_minutes = None
+        if state.last_successful_global_fetch:
+            cached_data_age_minutes = (
+                datetime.now(UTC) - state.last_successful_global_fetch
+            ).total_seconds() / 60
+
+        mode = "NORMAL"
+        if all_connectors_failed:
+            mode = "OFFLINE"
+        elif len(degraded_connectors) > total_connectors // 2:
+            mode = "DEGRADED"
+
+        uncertainty_factor = self._calculate_uncertainty_factor(
+            mode, cached_data_age_minutes
+        )
+
+        return DegradationStatus(
+            region_id=region_id,
+            mode=mode,
+            all_connectors_failed=all_connectors_failed,
+            failed_connector_count=len(degraded_connectors),
+            total_connector_count=total_connectors,
+            degraded_connectors=degraded_connectors,
+            last_successful_fetch=state.last_successful_global_fetch,
+            cached_data_age_minutes=cached_data_age_minutes,
+            uncertainty_factor=uncertainty_factor,
+        )
+
+    def _get_or_create_region_state(self, region_id: str) -> RegionDegradationState:
+        """Get or create the degradation state tracker for a region."""
+        if region_id not in self._region_degradation_states:
+            self._region_degradation_states[region_id] = RegionDegradationState(
+                region_id=region_id,
+                cached_events=[],
+                last_successful_global_fetch=None,
+                consecutive_failures={
+                    name: 0 for name in CONNECTOR_DEFAULT_POLL_INTERVALS
+                },
+                connector_last_success={
+                    name: None for name in CONNECTOR_DEFAULT_POLL_INTERVALS
+                },
+            )
+        return self._region_degradation_states[region_id]
+
+    @staticmethod
+    def _merge_with_cache(
+        fresh_events: list[Event], cached_events: list[Event]
+    ) -> list[Event]:
+        """Merge fresh events with cached events, preferring fresh data."""
+        merged = list(fresh_events)
+        fresh_keys = {
+            (e.source, e.event_type, round(e.timestamp.timestamp() / 60))
+            for e in fresh_events
+        }
+
+        for cached in cached_events:
+            cache_key = (
+                cached.source,
+                cached.event_type,
+                round(cached.timestamp.timestamp() / 60),
+            )
+            if cache_key not in fresh_keys:
+                merged.append(cached)
+
+        return merged
+
+    @staticmethod
+    def _calculate_uncertainty_factor(
+        mode: str, cached_data_age_minutes: float | None
+    ) -> float:
+        """Calculate uncertainty factor based on degradation mode and data age."""
+        if mode == "NORMAL":
+            return 0.0
+
+        base_factor = 0.25 if mode == "DEGRADED" else 0.5
+        age_penalty = 0.0
+
+        if cached_data_age_minutes is not None:
+            age_penalty = min(cached_data_age_minutes / 60, 0.5)
+
+        return min(base_factor + age_penalty, 0.9)
 
     async def _from_ais(self, bbox: tuple[float, float, float, float]) -> list[Event]:
         snapshots = await self.ais_connector.fetch_positions(bbox=bbox)
@@ -194,7 +388,9 @@ class FeedAggregator:
         region_id: str,
         bbox: tuple[float, float, float, float],
     ) -> list[Event]:
-        weather_events = await self.weather_connector.fetch(region_id=region_id, bbox=bbox)
+        weather_events = await self.weather_connector.fetch(
+            region_id=region_id, bbox=bbox
+        )
         events: list[Event] = []
         for item in weather_events:
             events.append(
@@ -244,9 +440,14 @@ class FeedAggregator:
         center_lat, center_lon = self._bbox_center(bbox)
 
         # Task 012 keeps this connector integration minimal until shipment registry API lands.
-        shipment_ids = [f"{region_id}-demo-shipment-001", f"{region_id}-demo-shipment-002"]
+        shipment_ids = [
+            f"{region_id}-demo-shipment-001",
+            f"{region_id}-demo-shipment-002",
+        ]
 
-        updates = await self.carrier_connector.fetch_shipments(shipment_ids=shipment_ids, carrier="maersk")
+        updates = await self.carrier_connector.fetch_shipments(
+            shipment_ids=shipment_ids, carrier="maersk"
+        )
         events: list[Event] = []
         for item in updates:
             event_type = "DELAY_ALERT" if item.delay_hours > 24 else "SHIPMENT_STATUS"
@@ -337,7 +538,9 @@ class FeedAggregator:
         return CONNECTOR_DEFAULT_POLL_INTERVALS[connector]
 
     @staticmethod
-    def _connector_status(last_successful_fetch: datetime | None, poll_interval_seconds: int) -> str:
+    def _connector_status(
+        last_successful_fetch: datetime | None, poll_interval_seconds: int
+    ) -> str:
         if last_successful_fetch is None:
             return "DEGRADED"
 

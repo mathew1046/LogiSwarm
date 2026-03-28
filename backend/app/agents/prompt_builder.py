@@ -17,6 +17,7 @@ class AgentPromptBuilder:
         memory_lines: list[str] | None = None,
         recent_resolved_lines: list[str] | None = None,
         neighbor_alert_lines: list[str] | None = None,
+        degradation_caveat: str | None = None,
         now_utc: datetime | None = None,
     ) -> str:
         """Create a bounded prompt with seasonal and dynamic context injections."""
@@ -28,6 +29,10 @@ class AgentPromptBuilder:
             base_prompt.strip(),
             f"Current season context: {season}",
         ]
+
+        if degradation_caveat:
+            sections.append("")
+            sections.append(degradation_caveat)
 
         if recent_resolved_lines:
             sections.append("Recent resolved disruptions (last 30 days):")

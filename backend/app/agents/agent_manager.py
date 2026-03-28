@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agents.base_agent import GeoAgent
+from app.agents.base_agent import GeoAgent, PerceptionResult
 from app.agents.llm_core import ClaudeReasoningCore
 from app.agents.memory import SeedMemoryResult, ZepEpisodicMemory
 from app.agents.regions.china_ea_agent import ChinaEastAsiaGeoAgent
@@ -15,6 +15,7 @@ from app.agents.regions.europe_agent import EuropeGeoAgent
 from app.agents.regions.gulf_suez_agent import GulfSuezGeoAgent
 from app.agents.regions.north_america_agent import NorthAmericaGeoAgent
 from app.agents.regions.se_asia_agent import SEAsiaGeoAgent
+from app.feeds.aggregator import FeedAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,7 @@ class AgentManager:
 
     @staticmethod
     def _status_payload(agent: GeoAgent) -> dict[str, Any]:
+        degradation_status = agent.last_degradation_status
         return {
             "region_id": agent.region_id,
             "region_name": agent.region_name,
@@ -208,7 +210,84 @@ class AgentManager:
             if agent.last_cycle_at
             else None,
             "last_assessment": agent.last_decision,
+            "degradation_status": {
+                "mode": degradation_status.mode if degradation_status else "NORMAL",
+                "is_degraded": degradation_status is not None
+                and degradation_status.mode != "NORMAL",
+                "degraded_connectors": degradation_status.degraded_connectors
+                if degradation_status
+                else [],
+                "cached_data_age_minutes": degradation_status.cached_data_age_minutes
+                if degradation_status
+                else None,
+                "uncertainty_factor": degradation_status.uncertainty_factor
+                if degradation_status
+                else 0.0,
+            }
+            if degradation_status
+            else None,
         }
+
+    def get_agent_degradation_status(self, region_id: str) -> AgentDegradationResponse:
+        """Return the degradation status for one regional agent."""
+        agent = self.get_agent(region_id)
+        status = agent.last_degradation_status
+
+        if status is None:
+            return AgentDegradationResponse(
+                region_id=agent.region_id,
+                region_name=agent.region_name,
+                mode="NORMAL",
+                is_degraded=False,
+                degraded_connectors=[],
+                cached_data_age_minutes=None,
+                uncertainty_factor=0.0,
+                last_successful_fetch=None,
+            )
+
+        return AgentDegradationResponse(
+            region_id=agent.region_id,
+            region_name=agent.region_name,
+            mode=status.mode,
+            is_degraded=status.mode != "NORMAL",
+            degraded_connectors=status.degraded_connectors,
+            cached_data_age_minutes=status.cached_data_age_minutes,
+            uncertainty_factor=status.uncertainty_factor,
+            last_successful_fetch=status.last_successful_fetch,
+        )
+
+    async def get_all_degradation_statuses(self) -> list[AgentDegradationResponse]:
+        """Return degradation status for all agents."""
+        statuses = []
+        for agent in self.agents.values():
+            status = agent.last_degradation_status
+            if status is None:
+                statuses.append(
+                    AgentDegradationResponse(
+                        region_id=agent.region_id,
+                        region_name=agent.region_name,
+                        mode="NORMAL",
+                        is_degraded=False,
+                        degraded_connectors=[],
+                        cached_data_age_minutes=None,
+                        uncertainty_factor=0.0,
+                        last_successful_fetch=None,
+                    )
+                )
+            else:
+                statuses.append(
+                    AgentDegradationResponse(
+                        region_id=agent.region_id,
+                        region_name=agent.region_name,
+                        mode=status.mode,
+                        is_degraded=status.mode != "NORMAL",
+                        degraded_connectors=status.degraded_connectors,
+                        cached_data_age_minutes=status.cached_data_age_minutes,
+                        uncertainty_factor=status.uncertainty_factor,
+                        last_successful_fetch=status.last_successful_fetch,
+                    )
+                )
+        return statuses
 
 
 agent_manager = AgentManager()
@@ -232,6 +311,21 @@ class SeedMemoryResponse(BaseModel):
     episodes_skipped: int
     episodes_total: int
     errors: list[str] = Field(default_factory=list)
+
+
+class AgentDegradationResponse(BaseModel):
+    """Response for agent degradation status."""
+
+    model_config = ConfigDict(extra="allow")
+
+    region_id: str
+    region_name: str
+    mode: str
+    is_degraded: bool
+    degraded_connectors: list[str]
+    cached_data_age_minutes: float | None
+    uncertainty_factor: float
+    last_successful_fetch: datetime | None
 
 
 @router.get("", response_model=Envelope)
@@ -329,3 +423,26 @@ async def seed_agent_memory(
         episodes_total=result.episodes_total,
         errors=result.errors,
     )
+
+
+@router.get("/degradation-status", response_model=Envelope)
+async def get_all_degradation_statuses() -> Envelope:
+    """Return degradation status for all agents."""
+    statuses = await agent_manager.get_all_degradation_statuses()
+    return Envelope(
+        data=[s.model_dump() for s in statuses],
+        error=None,
+        meta={"total": len(statuses)},
+    )
+
+
+@router.get("/{region_id}/degradation-status", response_model=Envelope)
+async def get_agent_degradation_status(region_id: str) -> Envelope:
+    """Return degradation status for one agent."""
+    try:
+        status = agent_manager.get_agent_degradation_status(region_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
+    return Envelope(data=status.model_dump(), error=None, meta=None)
