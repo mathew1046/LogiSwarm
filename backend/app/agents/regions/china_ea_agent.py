@@ -52,18 +52,21 @@ class ChinaEastAsiaGeoAgent(GeoAgent):
             "Elevate risk when factory sensor idle rates rise or export declaration volume weakens via customs-proxy signals."
         )
 
-    async def perceive(self, lookback_minutes: int = 60) -> list[Event]:
+    async def perceive(self, lookback_minutes: int = 60) -> "PerceptionResult":
         """Track factory-idle proxies from port simulator anomaly patterns."""
-        events = await super().perceive(lookback_minutes=lookback_minutes)
+        from app.agents.base_agent import PerceptionResult
+
+        perception_result = await super().perceive(lookback_minutes=lookback_minutes)
         self.last_factory_idle_signals = len(
             [
                 event
-                for event in events
+                for event in perception_result.events
                 if event.source == "port_simulator"
-                and str(event.event_type).upper() in {"CRANE_IDLE_6H", "DWELL_TIME_SURGE"}
+                and str(event.event_type).upper()
+                in {"CRANE_IDLE_6H", "DWELL_TIME_SURGE"}
             ]
         )
-        return events
+        return perception_result
 
     async def reason(self, events: list[Event]) -> Decision:
         """Attach factory-idle proxy metadata to support risk explainability."""

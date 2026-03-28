@@ -54,11 +54,15 @@ class NorthAmericaGeoAgent(GeoAgent):
             "Weight carrier API delay/customs signals heavily because US carrier integrations are high-coverage and near real-time."
         )
 
-    async def perceive(self, lookback_minutes: int = 60) -> list[Event]:
+    async def perceive(self, lookback_minutes: int = 60) -> "PerceptionResult":
         """Track carrier signal volume to weight risk interpretation in the reasoning phase."""
-        events = await super().perceive(lookback_minutes=lookback_minutes)
-        self.last_carrier_signal_count = len([event for event in events if event.source == "carrier"])
-        return events
+        from app.agents.base_agent import PerceptionResult
+
+        perception_result = await super().perceive(lookback_minutes=lookback_minutes)
+        self.last_carrier_signal_count = len(
+            [event for event in perception_result.events if event.source == "carrier"]
+        )
+        return perception_result
 
     async def reason(self, events: list[Event]) -> Decision:
         """Attach carrier-signal weighting metadata to the decision output."""
