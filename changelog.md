@@ -1,6 +1,16 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
+[094][4bff805] feat(frontend): add onboarding tour with driver.js for first-time user guidance
+[093][ccc90fe] feat(frontend): add analytics dashboard with disruption history and performance charts
+[092][3ea431d] feat(api): add rate limiting with slowapi and per-endpoint quotas for LLM endpoints
+[091][2fd98bd] test: add end-to-end simulation test for Suez closure scenario covering full pipeline
+[090][e233008] test: add unit and integration test suite for agents, orchestrator, and feed connectors
+[089][f609f57] feat(api): add data export and outbound webhook registration for external integrations
+[088][3930621] feat(orchestrator): add what-if scenario builder for disruption planning and mitigation analysis
+[087][24295f8] feat(agents): implement agent interview feature for operator Q&A with geo-agent memory
+[086][036ec00] feat(agents): add South Asia, Latin America, and Africa geo-agents for global coverage
+[085][b2c8c39] feat(agents): add offline fallback mode with stale data reasoning and uncertainty flagging
 [084][92baad0] feat(report): add multi-language report generation with English and Chinese support
 [083][d1018ac] feat(api): add WebSocket endpoint for low-latency agent pulse and disruption alerts
 [081][b0cfa81] feat(auth): implement JWT-based RBAC with viewer/operator/admin roles
@@ -13,8 +23,6 @@ _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit 
 [074][4112301] feat(orchestrator): add predictive ETA recalculation for affected shipments on disruption
 [073][2b80e2c] feat(routes): extend optimizer with multi-modal sea/air/rail graph and handoff nodes
 [082][08aa2aa] feat(ops): add Prometheus metrics endpoint with per-region agent and LLM metrics
-[095][ccaa528] chore(legal): add AGPL-3.0 license and third-party attribution notices
-[096][c498bb0] feat(docker): add multi-stage production Docker builds with Nginx frontend serving
 
 [072][1fc350c] feat(demo): add seed script and one-command demo with Suez 2021 simulation scenario
 
