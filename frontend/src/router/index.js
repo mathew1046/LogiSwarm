@@ -66,6 +66,12 @@ const routes = [
     meta: { title: 'History' }
   },
   {
+    path: '/simulation',
+    name: 'simulation',
+    component: () => import('../views/SimulationView.vue'),
+    meta: { title: 'Simulation' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../views/NotFoundView.vue'),
