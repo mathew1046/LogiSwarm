@@ -1,7 +1,8 @@
 # Changelog
 _Latest commit on top. One line per task. Format: `[TaskID][commit hash] commit message`_
 
-[099][commit] security: add CSP headers, input sanitization, and dependency audit to CI pipeline
+[100][commit] release: v0.2.0 — complete smart supply chain swarm system with demo and documentation
+[099][afb69ef] security: add CSP headers, input sanitization, and dependency audit to CI pipeline
 [098][2025704] test(perf): add locust load tests and document performance benchmarks
 [097][749da22] docs(release): tag v0.2.0 with changelog for advanced features release
 [096][3cb79f7] feat(docker): add multi-stage production Docker builds with Nginx frontend serving
