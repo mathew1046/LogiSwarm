@@ -37,6 +37,7 @@ from app.api import (
     anomaly_router,
     auth_router,
     disruptions_router,
+    export_router,
     feeds_router,
     metrics_router,
     orchestrator_router,
@@ -47,6 +48,7 @@ from app.api import (
     scenarios_router,
     shipments_router,
     sse_router,
+    webhooks_router,
     websocket_router,
 )
 from app.api.shipments import start_risk_evaluator
@@ -177,6 +179,8 @@ app.include_router(anomaly_router)
 app.include_router(auth_router)
 app.include_router(websocket_router)
 app.include_router(scenarios_router)
+app.include_router(webhooks_router)
+app.include_router(export_router)
 
 
 @app.get("/health")

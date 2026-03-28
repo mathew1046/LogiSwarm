@@ -2,6 +2,7 @@ from app.api.actions import router as actions_router
 from app.api.anomaly import router as anomaly_router
 from app.api.auth import router as auth_router
 from app.api.disruptions import router as disruptions_router
+from app.api.export_webhooks import export_router, router as webhooks_router
 from app.api.feeds import router as feeds_router
 from app.api.metrics import router as metrics_router
 from app.api.orchestrator import router as orchestrator_router
@@ -32,4 +33,6 @@ __all__ = [
     "auth_router",
     "websocket_router",
     "scenarios_router",
+    "webhooks_router",
+    "export_router",
 ]
