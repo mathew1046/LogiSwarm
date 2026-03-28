@@ -34,6 +34,7 @@ from app.agents.agent_manager import agent_manager
 from app.api import (
     actions_router,
     agents_router,
+    analytics_router,
     anomaly_router,
     auth_router,
     disruptions_router,
@@ -181,6 +182,7 @@ app.include_router(websocket_router)
 app.include_router(scenarios_router)
 app.include_router(webhooks_router)
 app.include_router(export_router)
+app.include_router(analytics_router)
 
 
 @app.get("/health")

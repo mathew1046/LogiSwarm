@@ -1,4 +1,5 @@
 from app.api.actions import router as actions_router
+from app.api.analytics import router as analytics_router
 from app.api.anomaly import router as anomaly_router
 from app.api.auth import router as auth_router
 from app.api.disruptions import router as disruptions_router
@@ -35,4 +36,5 @@ __all__ = [
     "scenarios_router",
     "webhooks_router",
     "export_router",
+    "analytics_router",
 ]
