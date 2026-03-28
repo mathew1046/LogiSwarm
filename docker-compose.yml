@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: logiswarm
       POSTGRES_DB: logiswarm
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
     image: redis:7-alpine
     container_name: logiswarm-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,8 +37,16 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://logiswarm:logiswarm@postgres:5432/logiswarm
+      - REDIS_URL=redis://redis:6379
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME}
+      - LLM_FALLBACK_MODEL=${LLM_FALLBACK_MODEL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     command: >
-      sh -c "uv sync && uv run python -m http.server 5001"
+      sh -c "uv sync && uv run uvicorn app.main:app --host 0.0.0.0 --port 5001 --reload"
     ports:
       - "5001:5001"
     depends_on:

@@ -29,11 +29,19 @@ def upgrade() -> None:
         sa.Column("heading", sa.Float(), nullable=True),
         sa.Column("status", sa.String(length=64), nullable=False),
         sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("raw", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.PrimaryKeyConstraint("id"),
+        sa.Column(
+            "raw",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
+        sa.PrimaryKeyConstraint(
+            "id", "timestamp"
+        ),  # Composite key for TimescaleDB hypertable
     )
-    op.create_index("ix_vessel_positions_vessel_id", "vessel_positions", ["vessel_id"], unique=False)
-    op.create_index("ix_vessel_positions_timestamp", "vessel_positions", ["timestamp"], unique=False)
+    op.create_index(
+        "ix_vessel_positions_vessel_id", "vessel_positions", ["vessel_id"], unique=False
+    )
 
     op.execute(
         "SELECT create_hypertable('vessel_positions', 'timestamp', if_not_exists => TRUE);"

@@ -176,6 +176,22 @@ def _print_route_table(app: FastAPI) -> None:
         logger.info({"event": "route", "method": r["method"], "path": r["path"]})
 
 
+def _cors_config():
+    """Get CORS configuration from environment."""
+    origins_str = os.getenv("CORS_ALLOW_ORIGINS", "")
+    if origins_str:
+        origins = [origin.strip() for origin in origins_str.split(",")]
+    else:
+        origins = ["*"]  # Allow all in development
+
+    return {
+        "allow_origins": origins,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+
+
 app = FastAPI(title="LogiSwarm Backend", version=__version__, lifespan=lifespan)
 
 app.add_middleware(SecurityHeadersMiddleware)

@@ -37,9 +37,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(
-            ["disruption_id"], ["disruption_events.id"], ondelete="SET NULL"
-        ),
+        # Foreign key to hypertable with composite PK not supported - using application-level check
     )
     op.create_index("ix_reports_project_id", "reports", ["project_id"], unique=False)
     op.create_index(

@@ -96,56 +96,21 @@ def _sync_shutdown_handler(signum: int, frame) -> None:
     sys.exit(0 if signum == signal.SIGTERM else 1)
 
 
-def setup_signal_handlers() -> None:
-    signal.signal(signal.SIGTERM, _sync_shutdown_handler)
-    signal.signal(signal.SIGINT, _sync_shutdown_handler)
-
-    if sys.platform != "win32":
-        signal.signal(signal.SIGHUP, _sync_shutdown_handler)
-
-    logger.bind(event="signal_handlers_initialized").info(
-        "Signal handlers registered: SIGTERM, SIGINT"
-        + (", SIGHUP" if sys.platform != "win32" else "")
+async def graceful_shutdown(signum: int, frame) -> None:
+    signal_name = signal.Signals(signum).name
+    logger.bind(event="shutdown_signal", signal=signal_name).info(
+        f"Received {signal_name}, initiating graceful shutdown"
     )
 
-    start_time = time.time()
+    await execute_shutdown_sequence()
 
-    async def run_with_timeout(coro, name: str) -> bool:
+    if _shutdown_callback:
         try:
-            await asyncio.wait_for(coro, timeout=_shutdown_timeout_seconds)
-            elapsed = time.time() - start_time
-            logger.bind(
-                event="shutdown_step", step=name, elapsed_ms=f"{elapsed:.3f}"
-            ).info(f"Completed: {name}")
-            return True
-        except asyncio.TimeoutError:
-            logger.bind(event="shutdown_timeout", step=name).error(
-                f"Timeout ({_shutdown_timeout_seconds}s) exceeded for {name}"
-            )
-            return False
-
-    for handler in _shutdown_handlers:
-        handler_name = getattr(handler, "__name__", str(handler))
-        try:
-            if asyncio.iscoroutinefunction(handler):
-                await run_with_timeout(handler(), handler_name)
-            else:
-                handler()
-                elapsed = time.time() - start_time
-                logger.bind(
-                    event="shutdown_step",
-                    step=handler_name,
-                    elapsed_ms=f"{elapsed:.3f}",
-                ).info(f"Completed: {handler_name}")
+            _shutdown_callback()
         except Exception as e:
-            logger.bind(event="shutdown_error", step=handler_name, error=str(e)).error(
-                f"Error in {handler_name}: {e}"
+            logger.bind(event="shutdown_callback_error", error=str(e)).error(
+                f"Error in shutdown callback: {e}"
             )
-
-    total_elapsed = time.time() - start_time
-    logger.bind(event="shutdown_complete", total_ms=f"{total_elapsed:.3f}").info(
-        "Shutdown sequence complete"
-    )
 
     sys.exit(0 if signum == signal.SIGTERM else 1)
 

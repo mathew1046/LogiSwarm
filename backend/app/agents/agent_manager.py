@@ -531,7 +531,6 @@ async def get_agent_degradation_status(region_id: str) -> Envelope:
 
 
 @router.post("/{region_id}/interview", response_model=InterviewResponse)
-@rate_limit("10/minute")
 async def interview_agent(
     region_id: str, payload: InterviewRequest
 ) -> InterviewResponse:

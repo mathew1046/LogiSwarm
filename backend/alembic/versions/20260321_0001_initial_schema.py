@@ -21,6 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb")
 
+    # Create geo_regions first (referenced by other tables)
     op.create_table(
         "geo_regions",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -32,6 +33,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("name"),
     )
 
+    # Create shipment_records
     op.create_table(
         "shipment_records",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -41,34 +43,55 @@ def upgrade() -> None:
         sa.Column("destination", sa.String(length=128), nullable=True),
         sa.Column("status", sa.String(length=64), nullable=False),
         sa.Column("eta", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("shipment_ref"),
     )
 
+    # Create disruption_events with composite key for TimescaleDB
     op.create_table(
         "disruption_events",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("region_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("severity", sa.String(length=32), nullable=False),
         sa.Column("signal_type", sa.String(length=128), nullable=False),
-        sa.Column("detected_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "detected_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("cascade_score", sa.Float(), nullable=True),
         sa.ForeignKeyConstraint(["region_id"], ["geo_regions.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
+        sa.PrimaryKeyConstraint("id", "detected_at"),  # Composite key for hypertable
     )
-    op.create_index("ix_disruption_events_region_id", "disruption_events", ["region_id"], unique=False)
-    op.create_index("ix_disruption_events_detected_at", "disruption_events", ["detected_at"], unique=False)
+    op.create_index(
+        "ix_disruption_events_region_id",
+        "disruption_events",
+        ["region_id"],
+        unique=False,
+    )
 
+    # Create route_recommendations
     op.create_table(
         "route_recommendations",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("disruption_event_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("recommendation", sa.Text(), nullable=False),
         sa.Column("confidence", sa.Float(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.ForeignKeyConstraint(["disruption_event_id"], ["disruption_events.id"], ondelete="SET NULL"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        # Foreign key to hypertable not supported - using application-level check
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -78,18 +101,27 @@ def upgrade() -> None:
         unique=False,
     )
 
+    # Create agent_episodes
     op.create_table(
         "agent_episodes",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("region_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("episode_summary", sa.Text(), nullable=False),
         sa.Column("embedding_id", sa.String(length=255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["region_id"], ["geo_regions.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_agent_episodes_region_id", "agent_episodes", ["region_id"], unique=False)
+    op.create_index(
+        "ix_agent_episodes_region_id", "agent_episodes", ["region_id"], unique=False
+    )
 
+    # Create hypertable for disruption_events
     op.execute(
         "SELECT create_hypertable('disruption_events', 'detected_at', if_not_exists => TRUE);"
     )
@@ -99,10 +131,12 @@ def downgrade() -> None:
     op.drop_index("ix_agent_episodes_region_id", table_name="agent_episodes")
     op.drop_table("agent_episodes")
 
-    op.drop_index("ix_route_recommendations_disruption_event_id", table_name="route_recommendations")
+    op.drop_index(
+        "ix_route_recommendations_disruption_event_id",
+        table_name="route_recommendations",
+    )
     op.drop_table("route_recommendations")
 
-    op.drop_index("ix_disruption_events_detected_at", table_name="disruption_events")
     op.drop_index("ix_disruption_events_region_id", table_name="disruption_events")
     op.drop_table("disruption_events")
 

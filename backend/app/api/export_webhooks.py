@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.schemas.projects import Envelope, EnvelopeMeta
-from app.db.base import SessionLocal
+from app.db.session import SessionLocal
 
 
 ExportFormat = Literal["csv", "json"]

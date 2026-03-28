@@ -69,7 +69,7 @@ class RouteOptimizationEngine:
         self.graph = self._default_route_graph()
         self.multimodal_graph = MULTIMODAL_GRAPH if use_multimodal else {}
 
-async def optimize(
+    async def optimize(
         self,
         *,
         origin: str,
@@ -79,19 +79,21 @@ async def optimize(
     ) -> RouteOptimizationResult:
         """Return top-3 alternatives excluding disrupted regions where possible."""
         blocked = {region for region in disrupted_regions}
-        
-        alternatives = self._k_shortest_paths(origin=origin, destination=destination, blocked=blocked, k=3)
-        
+
+        alternatives = self._k_shortest_paths(
+            origin=origin, destination=destination, blocked=blocked, k=3
+        )
+
         multimodal_alternatives = []
         if self.use_multimodal:
             multimodal_alternatives = self._find_multimodal_paths(
                 origin=origin, destination=destination, blocked=blocked, k=2
             )
-        
+
         all_alternatives = alternatives + multimodal_alternatives
         all_alternatives.sort(key=lambda x: x.score)
         all_alternatives = all_alternatives[:5]
-        
+
         result = RouteOptimizationResult(
             origin=origin,
             destination=destination,
@@ -101,7 +103,9 @@ async def optimize(
             generated_at=datetime.now(UTC),
             multimodal_available=len(multimodal_alternatives) > 0,
         )
-        result.summary = await self._summarize_with_llm(current_route=current_route, result=result)
+        result.summary = await self._summarize_with_llm(
+            current_route=current_route, result=result
+        )
         return result
 
     def _k_shortest_paths(
@@ -161,15 +165,17 @@ async def optimize(
     ) -> list[RouteAlternative]:
         if origin not in MULTIMODAL_NODES or destination not in MULTIMODAL_NODES:
             return []
-        
+
         candidates: list[RouteAlternative] = []
         queue: list[tuple[float, str, list[str], list[str], float, float, float]] = [
             (0.0, origin, [origin], [], 0.0, 0.0, 1.0)
         ]
-        
+
         while queue and len(candidates) < k:
-            score, node, path, modes, cost_delta, eta_delta, reliability = heapq.heappop(queue)
-            
+            score, node, path, modes, cost_delta, eta_delta, reliability = (
+                heapq.heappop(queue)
+            )
+
             if node == destination:
                 candidates.append(
                     RouteAlternative(
@@ -184,27 +190,35 @@ async def optimize(
                     )
                 )
                 continue
-            
+
             for edge in self.multimodal_graph.get(node, []):
                 target = edge["target"]
                 if target in path:
                     continue
                 if target in blocked and target != destination:
                     continue
-                
+
                 mode = edge.get("mode", TransportMode.SEA)
                 next_path = [*path, target]
                 next_modes = modes + [mode]
                 next_cost = cost_delta + edge["cost"]
                 next_eta = eta_delta + edge["time"]
                 next_reliability = reliability * edge["reliability"]
-                
+
                 weighted_score = next_cost + next_eta + ((1 - next_reliability) * 10)
                 heapq.heappush(
                     queue,
-                    (weighted_score, target, next_path, next_modes, next_cost, next_eta, next_reliability),
+                    (
+                        weighted_score,
+                        target,
+                        next_path,
+                        next_modes,
+                        next_cost,
+                        next_eta,
+                        next_reliability,
+                    ),
                 )
-        
+
         return candidates
 
     async def _summarize_with_llm(

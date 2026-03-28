@@ -104,7 +104,7 @@ class GraphMemoryExtractor:
         "closed": "closed",
     }
 
-    def __init__() -> None:
+    def __init__(self) -> None:
         pass
 
     def extract_entities(
