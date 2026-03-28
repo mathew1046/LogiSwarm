@@ -46,7 +46,7 @@ from app.errors import (
     http_exception_handler_custom,
     validation_exception_handler,
 )
-from app.middleware import RequestIDMiddleware
+from app.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 
 from app.agents.agent_manager import agent_manager
 from app.api import (
@@ -178,6 +178,7 @@ def _print_route_table(app: FastAPI) -> None:
 
 app = FastAPI(title="LogiSwarm Backend", version=__version__, lifespan=lifespan)
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(CORSMiddleware, **_cors_config())
 

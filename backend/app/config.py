@@ -96,6 +96,11 @@ OPTIONAL_ENV_VARS: dict[str, tuple[Any, str]] = {
     "ENVIRONMENT": ("dev", "Environment (dev, staging, production)"),
     "CORS_ALLOW_ORIGINS": ("", "Comma-separated CORS allowed origins"),
     "LOG_LEVEL": ("INFO", "Logging level (DEBUG, INFO, WARNING, ERROR)"),
+    "JWT_SECRET_KEY": (
+        "",
+        'JWT signing secret (generate with: python -c "import secrets; print(secrets.token_hex(32))")',
+    ),
+    "JWT_EXPIRATION_HOURS": ("24", "JWT token expiration time in hours"),
 }
 
 
