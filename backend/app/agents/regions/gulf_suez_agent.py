@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.agents.base_agent import Decision, Event, GeoAgent
+from app.agents.base_agent import Decision, Event, GeoAgent, PerceptionResult
 
 
 class GulfSuezGeoAgent(GeoAgent):
@@ -40,9 +40,11 @@ class GulfSuezGeoAgent(GeoAgent):
             "when multi-source indicators align."
         )
 
-    async def reason(self, events: list[Event]) -> Decision:
+    async def reason(
+        self, events: list[Event], perception_result: PerceptionResult | None = None
+    ) -> Decision:
         """Attach corridor-specific sensitivity metadata to the assessment output."""
-        decision = await super().reason(events)
+        decision = await super().reason(events, perception_result)
         decision["confidence_threshold"] = self.confidence_threshold
         decision["gdelt_political_weight"] = self.gdelt_political_weight
         decision["alert_sensitivity"] = "elevated"

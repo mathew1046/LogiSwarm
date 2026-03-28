@@ -10,22 +10,28 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.agents.base_agent import GeoAgent, PerceptionResult
 from app.agents.llm_core import ClaudeReasoningCore
 from app.agents.memory import SeedMemoryResult, ZepEpisodicMemory
+from app.agents.regions.africa_agent import AfricaGeoAgent
 from app.agents.regions.china_ea_agent import ChinaEastAsiaGeoAgent
 from app.agents.regions.europe_agent import EuropeGeoAgent
 from app.agents.regions.gulf_suez_agent import GulfSuezGeoAgent
+from app.agents.regions.latin_america_agent import LatinAmericaGeoAgent
 from app.agents.regions.north_america_agent import NorthAmericaGeoAgent
 from app.agents.regions.se_asia_agent import SEAsiaGeoAgent
+from app.agents.regions.south_asia_agent import SouthAsiaGeoAgent
 from app.feeds.aggregator import FeedAggregator
 
 logger = logging.getLogger(__name__)
 
 
 NEIGHBOR_MAP: dict[str, list[str]] = {
-    "se_asia": ["gulf_suez", "china_ea"],
+    "se_asia": ["gulf_suez", "china_ea", "south_asia"],
     "europe": ["gulf_suez", "north_america"],
-    "gulf_suez": ["se_asia", "europe"],
-    "north_america": ["europe"],
-    "china_ea": ["se_asia"],
+    "gulf_suez": ["se_asia", "europe", "south_asia"],
+    "north_america": ["europe", "latin_america"],
+    "china_ea": ["se_asia", "south_asia"],
+    "south_asia": ["se_asia", "gulf_suez", "china_ea", "africa"],
+    "latin_america": ["north_america", "africa"],
+    "africa": ["south_asia", "latin_america", "europe"],
 }
 
 
@@ -194,6 +200,18 @@ class AgentManager:
                 zep_client=self.zep_client,
             ),
             ChinaEastAsiaGeoAgent.REGION_ID: ChinaEastAsiaGeoAgent(
+                llm_client=self.llm_client,
+                zep_client=self.zep_client,
+            ),
+            SouthAsiaGeoAgent.REGION_ID: SouthAsiaGeoAgent(
+                llm_client=self.llm_client,
+                zep_client=self.zep_client,
+            ),
+            LatinAmericaGeoAgent.REGION_ID: LatinAmericaGeoAgent(
+                llm_client=self.llm_client,
+                zep_client=self.zep_client,
+            ),
+            AfricaGeoAgent.REGION_ID: AfricaGeoAgent(
                 llm_client=self.llm_client,
                 zep_client=self.zep_client,
             ),

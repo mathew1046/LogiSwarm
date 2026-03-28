@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.agents.base_agent import Decision, Event, GeoAgent
+from app.agents.base_agent import Decision, Event, GeoAgent, PerceptionResult
 
 
 class SEAsiaGeoAgent(GeoAgent):
@@ -40,15 +40,19 @@ class SEAsiaGeoAgent(GeoAgent):
             "that can impact Asia-Europe trade corridors."
         )
 
-    async def perceive(self, lookback_minutes: int = 60) -> list[Event]:
+    async def perceive(self, lookback_minutes: int = 60) -> PerceptionResult:
         """Fetch events and retain AIS vessel-volume signal for decision context."""
-        events = await super().perceive(lookback_minutes=lookback_minutes)
-        self.last_ais_vessel_count = len([event for event in events if event.source == "ais"])
-        return events
+        result = await super().perceive(lookback_minutes=lookback_minutes)
+        self.last_ais_vessel_count = len(
+            [e for e in result.events if e.source == "ais"]
+        )
+        return result
 
-    async def reason(self, events: list[Event]) -> Decision:
+    async def reason(
+        self, events: list[Event], perception_result: PerceptionResult | None = None
+    ) -> Decision:
         """Include AIS vessel load context with the LLM assessment output."""
-        decision = await super().reason(events)
+        decision = await super().reason(events, perception_result)
         decision["ais_vessel_count_observed"] = self.last_ais_vessel_count
         decision["ais_vessel_count_expected"] = self.ais_expected_vessel_count
         decision["ais_subscription"] = "active"

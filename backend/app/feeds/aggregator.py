@@ -20,6 +20,9 @@ DEFAULT_BBOX_BY_REGION: dict[str, tuple[float, float, float, float]] = {
     "gulf_suez": (32.0, 10.0, 60.0, 30.0),
     "north_america": (-130.0, 20.0, -60.0, 55.0),
     "china_ea": (100.0, 18.0, 145.0, 45.0),
+    "south_asia": (68.0, -5.0, 95.0, 25.0),
+    "latin_america": (-85.0, -60.0, -30.0, 15.0),
+    "africa": (-10.0, -40.0, 55.0, 5.0),
 }
 
 OFFLINE_MULTIPLIER = 3
