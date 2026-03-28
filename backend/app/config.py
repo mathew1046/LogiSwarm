@@ -44,9 +44,20 @@ REQUIRED_ENV_VARS: dict[str, str] = {
 }
 
 OPTIONAL_ENV_VARS: dict[str, tuple[Any, str]] = {
-    "LLM_API_KEY": ("", "Anthropic/OpenRouter API key for LLM calls"),
-    "LLM_BASE_URL": ("https://api.anthropic.com", "LLM API base URL"),
-    "LLM_MODEL_NAME": ("claude-sonnet-4-6", "LLM model name"),
+    "LLM_API_KEY": (
+        "",
+        "API key for LLM provider (Anthropic, OpenCode Go, OpenAI, etc.)",
+    ),
+    "LLM_BASE_URL": (
+        "https://api.anthropic.com",
+        "LLM API base URL. Supports: Anthropic (https://api.anthropic.com), "
+        "OpenCode Go (https://opencode.ai/zen/go/v1), OpenAI (https://api.openai.com), "
+        "Azure, Together AI, Fireworks, Groq",
+    ),
+    "LLM_MODEL_NAME": (
+        "claude-sonnet-4-6",
+        "LLM model name. Examples: claude-sonnet-4-6, minimax-m2.5, gpt-4, llama-3",
+    ),
     "LLM_MAX_CONCURRENT": ("5", "Maximum concurrent LLM calls"),
     "LLM_MIN_CYCLE_INTERVAL": ("60", "Minimum seconds between agent reasoning cycles"),
     "LLM_DAILY_BUDGET_USD": ("10.0", "Daily budget threshold for LLM calls (USD)"),

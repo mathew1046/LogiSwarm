@@ -17,12 +17,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
 from typing import Any, Literal
 
 import httpx
+from openai import AsyncOpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.rate_limiter import llm_rate_limiter
@@ -97,6 +99,30 @@ class ClaudeReasoningCore:
             os.getenv("LLM_FALLBACK_TIMEOUT_SECONDS", "10.0")
         )
 
+        # Detect if using OpenAI-compatible API (OpenCode Go, etc.)
+        self._is_openai_compatible = self._detect_openai_compatible(self.base_url)
+        self._openai_client: AsyncOpenAI | None = None
+
+        if self._is_openai_compatible:
+            self._openai_client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=self.timeout_seconds,
+            )
+
+    def _detect_openai_compatible(self, base_url: str) -> bool:
+        """Detect if the provider uses OpenAI-compatible API format."""
+        # OpenCode Go and similar providers use OpenAI format
+        openai_providers = [
+            "opencode.ai",
+            "openai.com",
+            "azure.com",
+            "together.xyz",
+            "fireworks.ai",
+            "groq.com",
+        ]
+        return any(provider in base_url.lower() for provider in openai_providers)
+
     async def reason(
         self,
         payload: dict[str, Any],
@@ -149,13 +175,16 @@ class ClaudeReasoningCore:
 
                 elapsed_ms = (time.perf_counter() - started_at) * 1000
                 usage = response_payload.get("usage", {})
+                provider_name = (
+                    "opencode" if self._is_openai_compatible else "anthropic"
+                )
                 llm_rate_limiter.log_call(
                     agent_id=self.agent_id,
                     model=model_to_use if use_fallback else self.model_name,
                     tokens_in=int(usage.get("input_tokens", 0)),
                     tokens_out=int(usage.get("output_tokens", 0)),
                     latency_ms=elapsed_ms,
-                    provider="anthropic",
+                    provider=provider_name,
                     model_type=current_mode,
                     fallback_used=use_fallback,
                 )
@@ -253,6 +282,20 @@ class ClaudeReasoningCore:
         effective_base_url = (base_url or self.base_url).rstrip("/")
         effective_model = model_override or self.model_name
 
+        # Use OpenAI-compatible client for providers like OpenCode Go
+        is_openai = self._is_openai_compatible or self._detect_openai_compatible(
+            effective_base_url
+        )
+        if is_openai:
+            return await self._call_openai_api(
+                system_prompt,
+                user_prompt,
+                effective_api_key,
+                effective_base_url,
+                effective_model,
+            )
+
+        # Original Anthropic API call
         endpoint = f"{effective_base_url}/v1/messages"
         headers = {
             "Content-Type": "application/json",
@@ -331,6 +374,81 @@ class ClaudeReasoningCore:
         if not isinstance(data, dict):
             raise ValueError("Unexpected LLM response format")
         return data
+
+    async def _call_openai_api(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        api_key: str,
+        base_url: str,
+        model: str,
+    ) -> dict[str, Any]:
+        """Call OpenAI-compatible API (OpenCode Go, etc.)."""
+        # Create temporary client if base_url differs (e.g., for fallback)
+        client = self._openai_client
+        if not client or base_url != self.base_url:
+            client = AsyncOpenAI(
+                api_key=api_key, base_url=base_url, timeout=self.timeout_seconds
+            )
+
+        # Build the full prompt with structured instructions
+        full_prompt = (
+            f"{system_prompt}\n\n"
+            f"{user_prompt}\n\n"
+            "You must respond with a JSON object matching this structure:\n"
+            "{\n"
+            '  "disruption_probability": <float 0.0-1.0>,\n'
+            '  "severity": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",\n'
+            '  "affected_routes": ["<route_id>", ...],\n'
+            '  "recommended_actions": ["<action>", ...],\n'
+            '  "confidence": <float 0.0-1.0>,\n'
+            '  "reasoning": "<explanation>"\n'
+            "}"
+        )
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": full_prompt}],
+            temperature=0.3,
+            max_tokens=self.max_tokens if self.max_tokens else None,
+        )
+
+        content = response.choices[0].message.content
+        if not content:
+            raise ValueError("OpenAI API returned empty response")
+
+        # Parse JSON from response
+        try:
+            # Extract JSON if wrapped in markdown code blocks
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0]
+
+            assessment = json.loads(content.strip())
+
+            # Convert to Anthropic-like response format
+            return {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "submit_assessment",
+                        "input": assessment,
+                    }
+                ],
+                "usage": {
+                    "input_tokens": response.usage.prompt_tokens
+                    if response.usage
+                    else 0,
+                    "output_tokens": response.usage.completion_tokens
+                    if response.usage
+                    else 0,
+                },
+            }
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse JSON response from LLM: {e}\nContent: {content}"
+            )
 
     @staticmethod
     def _build_user_prompt(events: list[Any], memory_episodes: list[Any]) -> str:
