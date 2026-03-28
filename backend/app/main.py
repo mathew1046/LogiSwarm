@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__version__ = "0.2.0"
+
 import logging
 import os
 import sys
@@ -113,7 +115,11 @@ configure_logging()
 async def lifespan(app: FastAPI):
     startup_logs: List[Dict[str, Any]] = []
     startup_logs.append(
-        {"event": "startup", "message": "Initializing LogiSwarm backend"}
+        {
+            "event": "startup",
+            "message": "Initializing LogiSwarm backend",
+            "version": __version__,
+        }
     )
 
     await init_redis_pool()
@@ -170,7 +176,7 @@ def _print_route_table(app: FastAPI) -> None:
         logger.info({"event": "route", "method": r["method"], "path": r["path"]})
 
 
-app = FastAPI(title="LogiSwarm Backend", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="LogiSwarm Backend", version=__version__, lifespan=lifespan)
 
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(CORSMiddleware, **_cors_config())
@@ -203,4 +209,4 @@ app.include_router(analytics_router)
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": __version__}

@@ -69,7 +69,7 @@ function goToProject(projectId) {
   <div class="home-page">
     <section class="hero">
       <div class="hero-content">
-        <span class="version-badge">v0.1.0</span>
+        <span class="version-badge">v0.2.0</span>
         <h1 class="hero-title">LogiSwarm</h1>
         <p class="hero-subtitle">Geo-aware swarm intelligence for supply chain disruption detection</p>
         <p class="hero-description">
