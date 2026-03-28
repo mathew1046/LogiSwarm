@@ -20,6 +20,20 @@ from app.agents.regions.se_asia_agent import SEAsiaGeoAgent
 from app.agents.regions.south_asia_agent import SouthAsiaGeoAgent
 from app.feeds.aggregator import FeedAggregator
 
+try:
+    from app.api_rate_limiter import rate_limit
+
+    RATE_LIMITING_AVAILABLE = True
+except ImportError:
+    RATE_LIMITING_AVAILABLE = False
+
+    def rate_limit(limit: str = "1000/minute"):
+        def decorator(func):
+            return func
+
+        return decorator
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -501,6 +515,7 @@ async def get_agent_degradation_status(region_id: str) -> Envelope:
 
 
 @router.post("/{region_id}/interview", response_model=InterviewResponse)
+@rate_limit("10/minute")
 async def interview_agent(
     region_id: str, payload: InterviewRequest
 ) -> InterviewResponse:
