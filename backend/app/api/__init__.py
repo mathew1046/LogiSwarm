@@ -9,6 +9,7 @@ from app.api.projects import router as projects_router
 from app.api.recommendations import router as recommendations_router
 from app.api.reports import router as reports_router
 from app.api.routes import router as routes_router
+from app.api.scenarios import router as scenarios_router
 from app.api.shipments import router as shipments_router
 from app.api.sse import router as sse_router
 from app.api.websocket import router as websocket_router
@@ -30,4 +31,5 @@ __all__ = [
     "anomaly_router",
     "auth_router",
     "websocket_router",
+    "scenarios_router",
 ]

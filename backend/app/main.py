@@ -44,6 +44,7 @@ from app.api import (
     recommendations_router,
     reports_router,
     routes_router,
+    scenarios_router,
     shipments_router,
     sse_router,
     websocket_router,
@@ -175,6 +176,7 @@ app.include_router(disruptions_router)
 app.include_router(anomaly_router)
 app.include_router(auth_router)
 app.include_router(websocket_router)
+app.include_router(scenarios_router)
 
 
 @app.get("/health")
