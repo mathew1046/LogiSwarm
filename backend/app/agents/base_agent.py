@@ -328,13 +328,182 @@ class GeoAgent(ABC):
                 error=str(exc),
             )
 
-    def _build_degradation_caveat(self, degradation_status: DegradationStatus) -> str:
+    def _build_degradation_caveat(self, degradation_status: "DegradationStatus") -> str:
         """Build a caveat string for degraded/offline mode."""
         cached_age = (
             degradation_status.cached_data_age_minutes
             if degradation_status.cached_data_age_minutes
             else 0
         )
+        failed_connectors = (
+            ", ".join(degradation_status.degraded_connectors) or "unknown"
+        )
+        return (
+            f"DATA QUALITY WARNING: This region is operating in {degradation_status.mode} mode. "
+            f"The following data sources are unavailable: {failed_connectors}. "
+            f"Current analysis is based on data cached {cached_age:.0f} minutes ago. "
+            f"Treat confidence scores with increased uncertainty. "
+            f"Uncertainty factor: {degradation_status.uncertainty_factor * 100:.0f}%."
+        )
+
+    async def interview(self, question: str) -> dict[str, Any]:
+        """Answer a question about the agent's region using memory and current state.
+
+        This allows operators to "interview" a geo-agent for insights about its region.
+        Returns the answer with sources cited (memory episodes consulted).
+        """
+        memory_episodes = []
+        try:
+            if hasattr(self.zep_client, "search_similar_episodes"):
+                memory_episodes = await self.zep_client.search_similar_episodes(
+                    region_id=self.region_id,
+                    anomaly_description=question,
+                    top_k=5,
+                )
+        except Exception:
+            memory_episodes = []
+
+        memory_lines = self._format_memory_lines(memory_episodes)
+        recent_resolved = self._recent_resolved_lines(memory_episodes)
+
+        current_events_summary = self._summarize_current_events()
+        current_assessment_summary = self._summarize_last_assessment()
+
+        interview_prompt = self._build_interview_prompt(
+            question=question,
+            memory_lines=memory_lines,
+            recent_resolved=recent_resolved,
+            current_events_summary=current_events_summary,
+            current_assessment_summary=current_assessment_summary,
+        )
+
+        answer = await self._call_llm_for_interview(interview_prompt)
+
+        sources = [
+            {
+                "episode_id": episode.episode_id,
+                "content": episode.content,
+                "severity": episode.metadata.severity,
+                "created_at": episode.created_at.isoformat(),
+            }
+            for episode in memory_episodes
+            if hasattr(episode, "episode_id")
+        ][:5]
+
+        return {
+            "region_id": self.region_id,
+            "region_name": self.region_name,
+            "question": question,
+            "answer": answer,
+            "sources": sources,
+            "current_risk_level": self.last_decision.get("severity")
+            if self.last_decision
+            else "UNKNOWN",
+            "current_confidence": self.last_decision.get("confidence")
+            if self.last_decision
+            else 0.0,
+            "answered_at": datetime.now(UTC).isoformat(),
+        }
+
+    def _summarize_current_events(self) -> str:
+        """Summarize current events for interview context."""
+        if not self.last_events:
+            return "No current events in context."
+
+        event_types = {}
+        for event in self.last_events[:20]:
+            key = f"{event.source}:{event.event_type}"
+            event_types[key] = event_types.get(key, 0) + 1
+
+        lines = [
+            f"- {event_type}: {count}"
+            for event_type, count in sorted(event_types.items(), key=lambda x: -x[1])[
+                :10
+            ]
+        ]
+        return "\n".join(lines) if lines else "No current events."
+
+    def _summarize_last_assessment(self) -> str:
+        """Summarize last assessment for interview context."""
+        if not self.last_decision:
+            return "No recent assessment available."
+
+        severity = self.last_decision.get("severity", "UNKNOWN")
+        confidence = self.last_decision.get("confidence", 0.0)
+        reasoning = self.last_decision.get("reasoning", "No reasoning provided.")[:500]
+        actions = self.last_decision.get("recommended_actions", [])[:3]
+
+        summary = f"Severity: {severity}, Confidence: {confidence:.2%}\n"
+        summary += f"Reasoning: {reasoning}\n"
+        if actions:
+            summary += "Recommended actions:\n"
+            for action in actions:
+                summary += f"- {action}\n"
+        return summary
+
+    def _build_interview_prompt(
+        self,
+        question: str,
+        memory_lines: list[str],
+        recent_resolved: list[str],
+        current_events_summary: str,
+        current_assessment_summary: str,
+    ) -> str:
+        """Build the interview prompt for the LLM."""
+        prompt_parts = [
+            f"You are {self.region_name} Geo-Agent (ID: {self.region_id}).",
+            "Answer the operator's question about this region using your memory and current context.",
+            "Be factual, cite specific historical events when relevant, and acknowledge uncertainty.",
+            "",
+            "Current Events:",
+            current_events_summary,
+            "",
+            "Current Assessment:",
+            current_assessment_summary,
+            "",
+        ]
+
+        if memory_lines:
+            prompt_parts.append("Relevant Historical Memory:")
+            prompt_parts.extend(memory_lines[:5])
+            prompt_parts.append("")
+
+        if recent_resolved:
+            prompt_parts.append("Recent Resolved Disruptions:")
+            prompt_parts.extend(recent_resolved[:3])
+            prompt_parts.append("")
+
+        prompt_parts.append(f"Operator Question: {question}")
+        prompt_parts.append("")
+        prompt_parts.append(
+            "Provide a clear, informative answer. If you don't have enough information, say so."
+        )
+
+        return "\n".join(prompt_parts)
+
+    async def _call_llm_for_interview(self, prompt: str) -> str:
+        """Call the LLM to answer an interview question."""
+        if not hasattr(self.llm_client, "api_key") or not self.llm_client.api_key:
+            return "I'm unable to answer questions at this time. LLM configuration is missing."
+
+        try:
+            if hasattr(self.llm_client, "reason"):
+                result = self.llm_client.reason(
+                    {
+                        "system_prompt": "You are a logistics risk analyst specializing in "
+                        + self.region_name
+                        + "You provide factual, concise answers citing historical events when relevant.",
+                        "events": [],
+                        "memory_episodes": [],
+                        "question_context": prompt,
+                    }
+                )
+                decision = await result if asyncio.iscoroutine(result) else result
+                return decision.get("reasoning", "Unable to generate response.")
+            else:
+                return "LLM client does not support reasoning."
+        except Exception as e:
+            return f"I encountered an error while processing your question: {str(e)}"
         failed_connectors = (
             ", ".join(degradation_status.degraded_connectors) or "unknown"
         )

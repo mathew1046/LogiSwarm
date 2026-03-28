@@ -346,6 +346,40 @@ class AgentDegradationResponse(BaseModel):
     last_successful_fetch: datetime | None
 
 
+class InterviewRequest(BaseModel):
+    """Request body for agent interview."""
+
+    question: str = Field(
+        min_length=5, max_length=2000, description="Question to ask the agent"
+    )
+
+
+class InterviewSource(BaseModel):
+    """A source cited in an interview response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    episode_id: str | None = None
+    content: str | None = None
+    severity: str | None = None
+    created_at: str | None = None
+
+
+class InterviewResponse(BaseModel):
+    """Response from agent interview."""
+
+    model_config = ConfigDict(extra="allow")
+
+    region_id: str
+    region_name: str
+    question: str
+    answer: str
+    sources: list[InterviewSource] = Field(default_factory=list)
+    current_risk_level: str
+    current_confidence: float
+    answered_at: str
+
+
 @router.get("", response_model=Envelope)
 async def list_agents() -> Envelope:
     return Envelope(
@@ -464,3 +498,28 @@ async def get_agent_degradation_status(region_id: str) -> Envelope:
             status_code=404, detail=f"Agent '{region_id}' not found"
         ) from None
     return Envelope(data=status.model_dump(), error=None, meta=None)
+
+
+@router.post("/{region_id}/interview", response_model=InterviewResponse)
+async def interview_agent(
+    region_id: str, payload: InterviewRequest
+) -> InterviewResponse:
+    """Interview a geo-agent about its region using memory and current state."""
+    try:
+        agent = agent_manager.get_agent(region_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{region_id}' not found"
+        ) from None
+
+    result = await agent.interview(payload.question)
+    return InterviewResponse(
+        region_id=result["region_id"],
+        region_name=result["region_name"],
+        question=result["question"],
+        answer=result["answer"],
+        sources=[InterviewSource.model_validate(s) for s in result["sources"]],
+        current_risk_level=result["current_risk_level"],
+        current_confidence=result["current_confidence"],
+        answered_at=result["answered_at"],
+    )
