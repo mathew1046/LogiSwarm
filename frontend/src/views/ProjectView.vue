@@ -12,7 +12,9 @@ const projectStore = useProjectStore()
 const agentStore = useAgentStore()
 
 const activeStep = ref('setup')
-const completedSteps = ref([])
+const completedSteps = ref(['setup'])
+const isLoading = ref(true)
+const error = ref(null)
 
 const steps = [
   { id: 'setup', label: 'Setup' },
@@ -55,8 +57,16 @@ function getConfidencePercent(confidence) {
 
 onMounted(async () => {
   if (route.params.id) {
-    await projectStore.fetchProject(route.params.id)
-    await agentStore.fetchAgents()
+    try {
+      isLoading.value = true
+      error.value = null
+      await projectStore.fetchProject(route.params.id)
+      await agentStore.fetchAgents()
+    } catch (err) {
+      error.value = err.message || 'Failed to load project'
+    } finally {
+      isLoading.value = false
+    }
   }
 })
 
@@ -64,21 +74,48 @@ function goToStep(stepId) {
   const currentIndex = steps.findIndex(s => s.id === activeStep.value)
   const targetIndex = steps.findIndex(s => s.id === stepId)
 
+  // Allow navigation if stepping backward, or if step was already completed, or if it's the next uncompleted step
   if (targetIndex <= currentIndex || completedSteps.value.includes(stepId)) {
     activeStep.value = stepId
+    // Mark as completed when visiting
+    if (!completedSteps.value.includes(stepId)) {
+      completedSteps.value.push(stepId)
+    }
   }
+}
+
+function nextStep() {
+  const currentIndex = steps.findIndex(s => s.id === activeStep.value)
+  if (currentIndex < steps.length - 1) {
+    const nextStepId = steps[currentIndex + 1].id
+    activeStep.value = nextStepId
+    if (!completedSteps.value.includes(nextStepId)) {
+      completedSteps.value.push(nextStepId)
+    }
+  }
+}
+
+function prevStep() {
+  const currentIndex = steps.findIndex(s => s.id === activeStep.value)
+  if (currentIndex > 0) {
+    activeStep.value = steps[currentIndex - 1].id
+  }
+}
+
+function startMonitoring() {
+  nextStep()
+}
+
+function runSimulation() {
+  router.push('/simulation')
 }
 
 function goToMap() {
-  if (currentProject.value) {
-    router.push(`/projects/${currentProject.value.id}/map`)
-  }
+  router.push(`/projects/${route.params.id}/map`)
 }
 
 function goToReports() {
-  if (currentProject.value) {
-    router.push(`/projects/${currentProject.value.id}/reports`)
-  }
+  router.push(`/projects/${route.params.id}/reports`)
 }
 </script>
 
@@ -88,7 +125,7 @@ function goToReports() {
       <header class="project-header">
         <div class="project-header__title">
           <h1>{{ currentProject?.name || 'Project Dashboard' }}</h1>
-          <span :class="['badge', getSeverityClass(currentProject?.status)]">
+          <span v-if="currentProject" :class="['badge', getSeverityClass(currentProject?.status)]">
             {{ currentProject?.status || 'idle' }}
           </span>
         </div>
@@ -107,6 +144,24 @@ function goToReports() {
           </button>
         </div>
       </header>
+
+      <div v-if="isLoading" class="loading-state">
+        <div class="loading__spinner"></div>
+        <p>Loading project...</p>
+      </div>
+
+      <div v-else-if="error" class="error-state">
+        <div class="error-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="error-state__title">Failed to Load Project</p>
+        <p class="error-state__text">{{ error }}</p>
+        <button class="btn btn--primary" @click="router.push('/projects')">
+          Back to Projects
+        </button>
+      </div>
 
       <StepWorkflow
         :steps="steps"
@@ -134,6 +189,14 @@ function goToReports() {
                   </span>
                 </div>
               </div>
+              <div class="setup-actions">
+                <button class="btn btn--primary" @click="startMonitoring">
+                  Start Monitoring
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -145,41 +208,53 @@ function goToReports() {
               <div class="loading__spinner"></div>
             </div>
 
-            <div v-else class="agents-grid">
-              <div
-                v-for="agent in agents"
-                :key="agent.region_id"
-                :class="['agent-card', 'card', 'card--glass', getRiskCardClass(agent.last_assessment?.severity)]"
-              >
-                <div class="agent-card__header">
-                  <h3>{{ agent.region_name }}</h3>
-                  <span :class="['badge', getSeverityClass(agent.last_assessment?.severity)]">
-                    {{ agent.last_assessment?.severity || 'LOW' }}
-                  </span>
-                </div>
-                <div class="agent-card__stats">
-                  <div class="stat">
-                    <span class="stat__label">Confidence</span>
-                    <span class="stat__value text-mono">
-                      {{ getConfidencePercent(agent.last_assessment?.confidence) }}%
-                    </span>
-                  </div>
-                  <div class="stat">
-                    <span class="stat__label">Status</span>
-                    <span class="stat__value">
-                      <span :class="['status-dot', { 'status-dot--active': agent.running }]"></span>
-                      {{ agent.running ? 'Running' : 'Stopped' }}
-                    </span>
-                  </div>
-                </div>
-                <div class="agent-card__reasoning" v-if="agent.last_assessment?.reasoning">
-                  <p>{{ agent.last_assessment.reasoning }}</p>
-                </div>
-                <div class="agent-card__time text-mono">
-                  Last cycle: {{ agent.last_cycle_at ? formatDate(agent.last_cycle_at) : 'Never' }}
-                </div>
+            <div v-else>
+              <div class="monitoring-actions">
+                <button class="btn btn--primary" @click="runSimulation">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Run Simulation
+                </button>
               </div>
-            </div>
+
+              <div class="agents-grid">
+                <div
+                  v-for="agent in agents"
+                  :key="agent.region_id"
+                  :class="['agent-card', 'card', 'card--glass', getRiskCardClass(agent.last_assessment?.severity)]"
+                >
+                  <div class="agent-card__header">
+                    <h3>{{ agent.region_name }}</h3>
+                    <span :class="['badge', getSeverityClass(agent.last_assessment?.severity)]">
+                      {{ agent.last_assessment?.severity || 'LOW' }}
+                    </span>
+                  </div>
+                  <div class="agent-card__stats">
+                    <div class="stat">
+                      <span class="stat__label">Confidence</span>
+                      <span class="stat__value text-mono">
+                        {{ getConfidencePercent(agent.last_assessment?.confidence) }}%
+                      </span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat__label">Status</span>
+                      <span class="stat__value">
+                        <span :class="['status-dot', { 'status-dot--active': agent.running }]"></span>
+                        {{ agent.running ? 'Running' : 'Stopped' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="agent-card__reasoning" v-if="agent.last_assessment?.reasoning">
+                    <p>{{ agent.last_assessment.reasoning }}</p>
+                  </div>
+                  <div class="agent-card__time text-mono">
+                    Last cycle: {{ agent.last_cycle_at ? formatDate(agent.last_cycle_at) : 'Never' }}
+                  </div>
+                </div>
+</div>
+          </div>
           </div>
 
           <div v-else-if="activeStep === 'disruption'" class="step-section">
@@ -253,6 +328,29 @@ function goToReports() {
           </div>
         </div>
       </StepWorkflow>
+
+      <div v-if="!isLoading && !error" class="step-navigation">
+        <button
+          class="btn btn--secondary"
+          :disabled="steps.findIndex(s => s.id === activeStep) === 0"
+          @click="prevStep"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 7l-5 5m0 0l5 5m-5-5h12" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Previous
+        </button>
+        <button
+          v-if="steps.findIndex(s => s.id === activeStep) < steps.length - 1"
+          class="btn btn--primary"
+          @click="nextStep"
+        >
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </ProjectLayout>
 </template>
@@ -456,5 +554,62 @@ function goToReports() {
 .success-icon {
   color: var(--color-success);
   margin-bottom: var(--spacing-4);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-12);
+  text-align: center;
+}
+
+.loading-state p {
+  margin-top: var(--spacing-4);
+  color: var(--color-text-secondary);
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-12);
+  text-align: center;
+}
+
+.error-icon {
+  color: var(--color-error);
+  margin-bottom: var(--spacing-4);
+}
+
+.error-state__title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin-bottom: var(--spacing-2);
+}
+
+.error-state__text {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-6);
+}
+
+.step-navigation {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--spacing-6);
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--spacing-6);
+}
+
+.setup-actions {
+  margin-top: var(--spacing-6);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.monitoring-actions {
+  margin-bottom: var(--spacing-6);
 }
 </style>

@@ -195,10 +195,10 @@ async def register(
     user_count = await session.execute(select(func.count()).select_from(User))
     is_first_user = user_count.scalar() == 0
 
-    role = "admin" if is_first_user else "viewer"
+    role = "admin" if is_first_user else "operator"
 
     if current_user is not None and current_user.is_admin:
-        role = "viewer"
+        role = "operator"
 
     user = User(
         email=payload.email.lower(),
