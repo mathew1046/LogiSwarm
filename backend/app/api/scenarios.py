@@ -20,10 +20,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.auth import require_operator
 from app.api.schemas.projects import Envelope, EnvelopeMeta
+from app.orchestrator.orchestrator import swarm_orchestrator
 from app.orchestrator.scenario_builder import (
-    Scenario,
+    HISTORICAL_SCENARIOS,
+    HistoricalScenario,
     ScenarioBuilder,
-    ScenarioComparison,
+    ScenarioCategory,
     ScenarioCreate,
     ScenarioMitigation,
     scenario_store,
@@ -31,6 +33,83 @@ from app.orchestrator.scenario_builder import (
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 scenario_builder = ScenarioBuilder()
+
+
+def _find_historical_scenario(scenario_id: str) -> HistoricalScenario:
+    """Look up a historical scenario by ID or raise 404."""
+    for scenario in HISTORICAL_SCENARIOS:
+        if scenario.scenario_id == scenario_id:
+            return scenario
+    raise HTTPException(
+        status_code=404, detail=f"Scenario '{scenario_id}' not found"
+    )
+
+
+@router.get("", response_model=Envelope)
+async def list_scenarios(
+    category: ScenarioCategory | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> Envelope:
+    """List all historical disruption scenarios with optional category filtering."""
+    scenarios: list[HistoricalScenario] = HISTORICAL_SCENARIOS
+
+    if category is not None:
+        scenarios = [s for s in scenarios if s.category == category]
+
+    total = len(scenarios)
+    paginated = scenarios[offset : offset + limit]
+
+    return Envelope(
+        data=[s.model_dump() for s in paginated],
+        error=None,
+        meta=EnvelopeMeta(total=total, limit=limit, offset=offset),
+    )
+
+
+@router.get("/categories", response_model=Envelope)
+async def list_scenario_categories() -> Envelope:
+    """List all scenario categories with counts."""
+    category_counts: dict[str, int] = {}
+    for scenario in HISTORICAL_SCENARIOS:
+        cat = scenario.category.value
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    categories = [
+        {"category": cat.value, "count": category_counts.get(cat.value, 0)}
+        for cat in ScenarioCategory
+    ]
+
+    return Envelope(data=categories, error=None, meta=None)
+
+
+@router.get("/{scenario_id}", response_model=Envelope)
+async def get_scenario(scenario_id: str) -> Envelope:
+    """Get a specific historical scenario by ID."""
+    scenario = _find_historical_scenario(scenario_id)
+    return Envelope(data=scenario.model_dump(), error=None, meta=None)
+
+
+@router.post("/{scenario_id}/run", response_model=Envelope)
+async def run_scenario(
+    scenario_id: str,
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
+    """Run a simulation using a historical scenario."""
+    scenario = _find_historical_scenario(scenario_id)
+
+    report = await swarm_orchestrator.run_simulation(
+        scenario=scenario_id,
+        start_date=scenario.date_start,
+        end_date=scenario.date_end,
+        scenario_id=scenario_id,
+    )
+
+    return Envelope(
+        data=report,
+        error=None,
+        meta={"scenario_id": scenario_id, "scenario_name": scenario.name},
+    )
 
 
 @router.post("", response_model=Envelope)
@@ -45,31 +124,6 @@ async def create_scenario(
         error=None,
         meta={"scenario_id": scenario.scenario_id},
     )
-
-
-@router.get("", response_model=Envelope)
-async def list_scenarios(
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-) -> Envelope:
-    """List all saved scenarios."""
-    scenarios = scenario_store.list(limit=limit, offset=offset)
-    return Envelope(
-        data=[s.model_dump() for s in scenarios],
-        error=None,
-        meta=EnvelopeMeta(total=len(scenarios), limit=limit, offset=offset),
-    )
-
-
-@router.get("/{scenario_id}", response_model=Envelope)
-async def get_scenario(scenario_id: str) -> Envelope:
-    """Get a specific scenario by ID."""
-    scenario = scenario_store.get(scenario_id)
-    if scenario is None:
-        raise HTTPException(
-            status_code=404, detail=f"Scenario '{scenario_id}' not found"
-        )
-    return Envelope(data=scenario.model_dump(), error=None, meta=None)
 
 
 @router.post("/{scenario_id}/mitigation", response_model=Envelope)

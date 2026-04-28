@@ -77,9 +77,15 @@ async def simulate(
     _operator: Any = Depends(require_operator),
 ) -> OrchestratorEnvelope:
     """Run a historical disruption simulation scenario."""
+    from datetime import UTC, datetime
+
+    start_date = payload.start_date or datetime(2020, 1, 1, tzinfo=UTC)
+    end_date = payload.end_date or datetime.now(UTC)
+
     report = await swarm_orchestrator.run_simulation(
         scenario=payload.scenario,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
+        start_date=start_date,
+        end_date=end_date,
+        scenario_id=payload.scenario_id,
     )
     return OrchestratorEnvelope(data=report, error=None, meta=None)

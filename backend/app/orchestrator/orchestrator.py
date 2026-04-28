@@ -30,6 +30,7 @@ from app.bus.connection import get_redis_client
 from app.bus.publisher import publish
 from app.orchestrator.escalation import EscalationDecision, EscalationEngine
 from app.orchestrator.propagation_model import DisruptionPropagationModel, PropagationResult
+from app.orchestrator.scenario_builder import HISTORICAL_SCENARIOS, HistoricalScenario
 
 
 class AgentAssessment(BaseModel):
@@ -173,8 +174,53 @@ class SwarmOrchestrator:
             payload=payload,
         )
 
-    async def run_simulation(self, *, scenario: str, start_date: datetime, end_date: datetime) -> dict[str, Any]:
-        """Replay historical scenario events and return detection-quality metrics."""
+    async def run_simulation(
+        self,
+        *,
+        scenario: str,
+        start_date: datetime,
+        end_date: datetime,
+        scenario_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Replay historical scenario events and return detection-quality metrics.
+
+        When ``scenario_id`` is provided the matching entry from
+        ``HISTORICAL_SCENARIOS`` is loaded and its trigger region, severity,
+        affected regions, and duration are used to run the propagation model.
+        The original event-replay path is preserved for backward compatibility.
+        """
+        historical: HistoricalScenario | None = None
+        if scenario_id:
+            for s in HISTORICAL_SCENARIOS:
+                if s.scenario_id == scenario_id:
+                    historical = s
+                    break
+            if historical is None:
+                raise ValueError(f"Historical scenario '{scenario_id}' not found")
+
+        if historical is None:
+            for s in HISTORICAL_SCENARIOS:
+                if s.scenario_id == scenario:
+                    historical = s
+                    break
+
+        if historical is not None:
+            start_date = historical.date_start
+            end_date = historical.date_end
+
+        propagation_impact: dict[str, Any] | None = None
+        trigger_region = historical.trigger_region if historical else scenario
+        severity = historical.severity if historical else "HIGH"
+
+        try:
+            propagation_result = self.propagation_model.propagate(
+                trigger_region=trigger_region,
+                severity=severity,
+            )
+            propagation_impact = propagation_result.model_dump(mode="json")
+        except Exception:
+            propagation_impact = None
+
         scenario_key = scenario.strip().lower()
         events = self._scenario_events().get(scenario_key, [])
 
@@ -191,9 +237,9 @@ class SwarmOrchestrator:
             replayed += 1
             self._upsert_assessment(event)
 
-            severity = str(event.get("severity") or "LOW").upper()
+            event_severity = str(event.get("severity") or "LOW").upper()
             confidence = float(event.get("confidence") or 0.0)
-            if severity in {"HIGH", "CRITICAL"}:
+            if event_severity in {"HIGH", "CRITICAL"}:
                 detections += 1
                 if first_alert_at is None:
                     first_alert_at = event_time
@@ -207,7 +253,7 @@ class SwarmOrchestrator:
         if first_alert_at is not None:
             mean_time_to_alert_hours = round((first_alert_at - start_date).total_seconds() / 3600, 2)
 
-        return {
+        result: dict[str, Any] = {
             "scenario": scenario_key,
             "window": {
                 "start_date": start_date.isoformat(),
@@ -220,6 +266,23 @@ class SwarmOrchestrator:
                 "mean_time_to_alert_hours": mean_time_to_alert_hours,
             },
         }
+
+        if historical is not None:
+            result["scenario_metadata"] = {
+                "scenario_id": historical.scenario_id,
+                "name": historical.name,
+                "trigger_region": historical.trigger_region,
+                "severity": historical.severity,
+                "affected_regions": historical.affected_regions,
+                "duration_days": historical.duration_days,
+                "category": historical.category.value,
+                "financial_impact_usd": historical.financial_impact_usd,
+            }
+
+        if propagation_impact is not None:
+            result["propagation_impact"] = propagation_impact
+
+        return result
 
     def _upsert_assessment(self, payload: dict[str, Any]) -> None:
         region_id = str(payload.get("region_id") or "unknown")

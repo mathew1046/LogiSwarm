@@ -29,8 +29,9 @@ class CascadeRiskRequest(BaseModel):
 
 class SimulateRequest(BaseModel):
     scenario: str = Field(min_length=1)
-    start_date: datetime
-    end_date: datetime
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    scenario_id: str | None = None
 
 
 class RouteOptimizeRequest(BaseModel):

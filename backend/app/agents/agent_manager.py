@@ -455,6 +455,77 @@ async def list_agents() -> Envelope:
     )
 
 
+@router.get("/topology", response_model=Envelope)
+async def get_agent_topology() -> Envelope:
+    """Return all agents with coordinates and neighbor edges for map visualization."""
+    from app.agents.agent_registry import AGENT_REGISTRY
+
+    neighbor_map = {}
+    for region_id, config in AGENT_REGISTRY.items():
+        proximity = _compute_proximity_neighbors(region_id, config, AGENT_REGISTRY)
+        manual = NEIGHBOR_MAP.get(region_id, [])
+        neighbor_map[region_id] = list(dict.fromkeys(manual + proximity))[:8]
+
+    nodes = []
+    for region_id, config in AGENT_REGISTRY.items():
+        agent = agent_manager.agents.get(region_id)
+        lon_min, lat_min, lon_max, lat_max = config["bbox"]
+        center_lon = (lon_min + lon_max) / 2
+        center_lat = (lat_min + lat_max) / 2
+        neighbors = neighbor_map.get(region_id, [])
+
+        status = agent.status_payload() if agent and hasattr(agent, "status_payload") else {}
+
+        nodes.append({
+            "region_id": region_id,
+            "region_name": config["region_name"],
+            "tier": config.get("tier", 3),
+            "specialization": config.get("specialization", "seaport"),
+            "parent_region": config.get("parent_region"),
+            "center_lat": center_lat,
+            "center_lon": center_lon,
+            "bbox": list(config["bbox"]),
+            "key_locations": config.get("key_locations", []),
+            "neighbors": neighbors,
+            "poll_interval_seconds": config.get("poll_interval_seconds", 180),
+            "confidence_threshold": config.get("confidence_threshold", 0.8),
+            "running": bool(agent and agent._task and not agent._task.done()) if agent else False,
+            "severity": agent.last_decision.get("severity", "LOW") if agent and agent.last_decision else "LOW",
+            "port_metrics": status.get("port_metrics") or {},
+            "vessel_metrics": status.get("vessel_metrics") or {},
+            "freight_economics": status.get("freight_economics") or {},
+            "weather_impact": status.get("weather_impact") or {},
+            "risk_signals": status.get("risk_signals") or {},
+            "inventory_status": status.get("inventory_status") or {},
+            "financial_impact": status.get("financial_impact") or {},
+            "sustainability_metrics": status.get("sustainability_metrics") or {},
+        })
+
+    edges = []
+    seen = set()
+    for node in nodes:
+        for neighbor_id in node["neighbors"]:
+            edge_key = tuple(sorted([node["region_id"], neighbor_id]))
+            if edge_key not in seen and neighbor_id in AGENT_REGISTRY:
+                seen.add(edge_key)
+                nb_config = AGENT_REGISTRY[neighbor_id]
+                nb_lon_min, nb_lat_min, nb_lon_max, nb_lat_max = nb_config["bbox"]
+                edges.append({
+                    "source": node["region_id"],
+                    "target": neighbor_id,
+                    "source_lat": node["center_lat"],
+                    "source_lon": node["center_lon"],
+                    "target_lat": (nb_lat_min + nb_lat_max) / 2,
+                    "target_lon": (nb_lon_min + nb_lon_max) / 2,
+                })
+
+    return Envelope(
+        data={"nodes": nodes, "edges": edges},
+        error=None,
+        meta={"total_agents": len(nodes), "total_edges": len(edges)},
+    )
+
+
 @router.get("/{region_id}/status", response_model=Envelope)
 async def get_agent_status(region_id: str) -> Envelope:
     try:

@@ -20,13 +20,13 @@ import os
 import random
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Extra, Field
 
 
 class PortSensorSnapshot(BaseModel):
     """Normalized mock port sensor snapshot for a single port node."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra=Extra.allow)
 
     region_id: str
     port_id: str
@@ -34,6 +34,10 @@ class PortSensorSnapshot(BaseModel):
     vessel_queue_depth: int = Field(ge=0)
     gate_throughput: float = Field(ge=0.0)
     dwell_time_hours: float = Field(ge=0.0)
+    berth_occupancy_pct: float = Field(ge=0.0, le=100.0)
+    yard_utilization_pct: float = Field(ge=0.0, le=100.0)
+    truck_turnaround_min: float = Field(ge=0.0)
+    reefer_plug_availability_pct: float = Field(ge=0.0, le=100.0)
     timestamp: datetime
     anomaly_type: str | None = None
 
@@ -73,6 +77,10 @@ class PortSensorSimulator:
         vessel_queue_depth = random.randint(4, 18)
         gate_throughput = round(random.uniform(85.0, 240.0), 2)
         dwell_time_hours = round(random.uniform(8.0, 28.0), 2)
+        berth_occupancy_pct = round(random.uniform(45.0, 85.0), 2)
+        yard_utilization_pct = round(random.uniform(50.0, 90.0), 2)
+        truck_turnaround_min = round(random.uniform(25.0, 65.0), 2)
+        reefer_plug_availability_pct = round(random.uniform(70.0, 98.0), 2)
 
         anomaly_type: str | None = None
         if random.random() < self.anomaly_probability:
@@ -81,12 +89,20 @@ class PortSensorSimulator:
                 vessel_queue_depth,
                 gate_throughput,
                 dwell_time_hours,
+                berth_occupancy_pct,
+                yard_utilization_pct,
+                truck_turnaround_min,
+                reefer_plug_availability_pct,
                 anomaly_type,
             ) = self._inject_anomaly(
                 crane_utilization_pct=crane_utilization_pct,
                 vessel_queue_depth=vessel_queue_depth,
                 gate_throughput=gate_throughput,
                 dwell_time_hours=dwell_time_hours,
+                berth_occupancy_pct=berth_occupancy_pct,
+                yard_utilization_pct=yard_utilization_pct,
+                truck_turnaround_min=truck_turnaround_min,
+                reefer_plug_availability_pct=reefer_plug_availability_pct,
             )
 
         return PortSensorSnapshot(
@@ -96,6 +112,10 @@ class PortSensorSimulator:
             vessel_queue_depth=vessel_queue_depth,
             gate_throughput=gate_throughput,
             dwell_time_hours=dwell_time_hours,
+            berth_occupancy_pct=berth_occupancy_pct,
+            yard_utilization_pct=yard_utilization_pct,
+            truck_turnaround_min=truck_turnaround_min,
+            reefer_plug_availability_pct=reefer_plug_availability_pct,
             timestamp=timestamp,
             anomaly_type=anomaly_type,
         )
@@ -106,7 +126,11 @@ class PortSensorSimulator:
         vessel_queue_depth: int,
         gate_throughput: float,
         dwell_time_hours: float,
-    ) -> tuple[float, int, float, float, str]:
+        berth_occupancy_pct: float,
+        yard_utilization_pct: float,
+        truck_turnaround_min: float,
+        reefer_plug_availability_pct: float,
+    ) -> tuple[float, int, float, float, float, float, float, float, str]:
         anomaly = random.choice(
             [
                 "CRANE_IDLE_6H",
@@ -119,21 +143,29 @@ class PortSensorSimulator:
         if anomaly == "CRANE_IDLE_6H":
             crane_utilization_pct = round(random.uniform(0.0, 8.0), 2)
             dwell_time_hours = max(dwell_time_hours, 6.0)
+            yard_utilization_pct = round(random.uniform(20.0, 40.0), 2)
         elif anomaly == "QUEUE_DEPTH_3X":
             vessel_queue_depth = max(vessel_queue_depth * 3, 30)
             dwell_time_hours = round(max(dwell_time_hours, random.uniform(24.0, 54.0)), 2)
+            berth_occupancy_pct = round(random.uniform(90.0, 98.0), 2)
         elif anomaly == "GATE_THROUGHPUT_DROP":
             gate_throughput = round(random.uniform(18.0, 50.0), 2)
             vessel_queue_depth = max(vessel_queue_depth, random.randint(20, 42))
+            truck_turnaround_min = round(random.uniform(90.0, 150.0), 2)
         else:
             dwell_time_hours = round(random.uniform(48.0, 96.0), 2)
             crane_utilization_pct = round(min(crane_utilization_pct, random.uniform(15.0, 40.0)), 2)
+            reefer_plug_availability_pct = round(random.uniform(30.0, 55.0), 2)
 
         return (
             crane_utilization_pct,
             vessel_queue_depth,
             gate_throughput,
             dwell_time_hours,
+            berth_occupancy_pct,
+            yard_utilization_pct,
+            truck_turnaround_min,
+            reefer_plug_availability_pct,
             anomaly,
         )
 
