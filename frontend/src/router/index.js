@@ -31,64 +31,34 @@ const routes = [
     meta: { title: 'Sign In', public: true }
   },
   {
-    path: '/projects',
-    name: 'projects',
-    component: () => import('../views/ProjectsView.vue'),
-    meta: { title: 'Projects' }
-  },
-  {
-    path: '/projects/new',
-    name: 'project-new',
-    component: () => import('../views/ProjectCreateView.vue'),
-    meta: { title: 'New Project', requiresAuth: true }
-  },
-  {
-    path: '/projects/:id',
-    name: 'project',
-    component: () => import('../views/ProjectView.vue'),
-    meta: { title: 'Project Dashboard' }
-  },
-  {
-    path: '/projects/:id/map',
-    name: 'project-map',
-    component: () => import('../views/ProjectMapView.vue'),
-    meta: { title: 'Risk Map' }
-  },
-  {
-    path: '/projects/:id/reports',
-    name: 'project-reports',
-    component: () => import('../views/ProjectReportsView.vue'),
-    meta: { title: 'Reports' }
-  },
-  {
-    path: '/projects/:id/interact',
-    name: 'project-interact',
-    component: () => import('../views/ProjectInteractView.vue'),
-    meta: { title: 'Interact' }
-  },
-  {
-    path: '/history',
-    name: 'history',
-    component: () => import('../views/HistoryView.vue'),
-    meta: { title: 'History' }
+    path: '/dashboard',
+    name: 'dashboard',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { title: 'Dashboard' }
   },
   {
     path: '/simulation',
     name: 'simulation',
     component: () => import('../views/SimulationView.vue'),
-    meta: { title: 'Simulation', requiresAuth: true }
+    meta: { title: 'Simulation' }
   },
   {
     path: '/agents',
     name: 'agents',
-    component: () => import('../views/AgentMapView.vue'),
-    meta: { title: 'Agent Map' }
+    component: () => import('../views/AgentsView.vue'),
+    meta: { title: 'Agents' }
   },
   {
-    path: '/reroute',
-    name: 'reroute',
-    component: () => import('../views/RerouteView.vue'),
-    meta: { title: 'Reroute Decision Support', requiresAuth: true }
+    path: '/reports',
+    name: 'reports',
+    component: () => import('../views/ReportsView.vue'),
+    meta: { title: 'Reports' }
+  },
+  {
+    path: '/routes',
+    name: 'routes',
+    component: () => import('../views/RoutesView.vue'),
+    meta: { title: 'Routes' }
   },
   {
     path: '/:pathMatch(.*)*',
@@ -108,7 +78,6 @@ router.beforeEach((to, _from, next) => {
 
   const authStore = useAuthStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
-  const isPublic = to.matched.some(record => record.meta.public)
 
   if (requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'login', query: { redirect: to.fullPath } })

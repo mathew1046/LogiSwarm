@@ -1,33 +1,15 @@
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { useProjectStore } from '@/stores/project'
-import { useAgentStore } from '@/stores/agent'
-import { useAlertStore } from '@/stores/alert'
-import { useFeedStore } from '@/stores/feed'
+import { onMounted } from 'vue'
+import { useSimpleAppStore } from '@/stores/simpleApp'
 import SidebarNav from './SidebarNav.vue'
 import TopBar from './TopBar.vue'
-import DegradationBanner from '@/components/feed/DegradationBanner.vue'
 
-const route = useRoute()
-const projectStore = useProjectStore()
-const agentStore = useAgentStore()
-const alertStore = useAlertStore()
-const feedStore = useFeedStore()
+const simpleAppStore = useSimpleAppStore()
 
 onMounted(async () => {
-  alertStore.initialize()
-
-  if (route.params.id) {
-    await projectStore.fetchProject(route.params.id)
+  if (!simpleAppStore.places.length) {
+    await simpleAppStore.bootstrap()
   }
-
-  agentStore.connectToSSE()
-  await feedStore.fetchDegradationStatus()
-})
-
-onUnmounted(() => {
-  agentStore.disconnectSSE()
 })
 </script>
 
@@ -36,7 +18,6 @@ onUnmounted(() => {
     <SidebarNav />
     <div class="app-layout__main">
       <TopBar />
-      <DegradationBanner />
       <main class="app-layout__content">
         <slot />
       </main>
