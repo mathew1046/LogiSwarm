@@ -48,36 +48,7 @@ from app.errors import (
 )
 from app.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 
-from app.agents.agent_manager import agent_manager
-from app.api import (
-    actions_router,
-    agents_ext_router,
-    agents_router,
-    analytics_router,
-    anomaly_router,
-    auth_router,
-    disruptions_router,
-    export_router,
-    feeds_router,
-    metrics_router,
-    orchestrator_router,
-    projects_router,
-    recommendations_router,
-    reports_router,
-    reroute_router,
-    routes_router,
-    scenarios_router,
-    shipments_router,
-    sse_router,
-    webhooks_router,
-    websocket_router,
-)
-from app.api.shipments import start_risk_evaluator
-from app.bus.connection import close_redis_pool, init_redis_pool
-from app.db.session import engine
-from app.orchestrator.eta_recalculator import eta_recalculator
-from app.orchestrator.orchestrator import swarm_orchestrator
-from app.shutdown import register_shutdown_handler, setup_signal_handlers
+from app.api import auth_router, simple_app_router
 
 
 class MaxTokensWarningFilter(logging.Filter):
@@ -124,35 +95,9 @@ async def lifespan(app: FastAPI):
         }
     )
 
-    await init_redis_pool()
     startup_logs.append(
-        {"event": "startup", "component": "redis", "status": "connected"}
+        {"event": "startup", "component": "simple_runtime", "status": "ready"}
     )
-
-    await swarm_orchestrator.start()
-    startup_logs.append(
-        {"event": "startup", "component": "orchestrator", "status": "started"}
-    )
-
-    await agent_manager.start_all()
-    startup_logs.append(
-        {"event": "startup", "component": "agents", "count": len(agent_manager.agents)}
-    )
-
-    await eta_recalculator.start()
-    startup_logs.append(
-        {"event": "startup", "component": "eta_recalculator", "status": "started"}
-    )
-
-    await start_risk_evaluator()
-    startup_logs.append(
-        {"event": "startup", "component": "risk_evaluator", "status": "started"}
-    )
-
-    register_shutdown_handler(lambda: swarm_orchestrator.stop())
-    register_shutdown_handler(lambda: agent_manager.stop_all())
-    register_shutdown_handler(lambda: eta_recalculator.stop())
-    register_shutdown_handler(lambda: close_redis_pool())
 
     for entry in startup_logs:
         logger.info(entry)
@@ -205,27 +150,8 @@ app.add_exception_handler(HTTPException, http_exception_handler_custom)
 app.add_exception_handler(AppException, app_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-app.include_router(projects_router)
-app.include_router(feeds_router)
-app.include_router(agents_router)
-app.include_router(agents_ext_router)
-app.include_router(orchestrator_router)
-app.include_router(actions_router)
-app.include_router(shipments_router)
-app.include_router(routes_router)
-app.include_router(reports_router)
-app.include_router(sse_router)
-app.include_router(metrics_router)
-app.include_router(recommendations_router)
-app.include_router(disruptions_router)
-app.include_router(anomaly_router)
 app.include_router(auth_router)
-app.include_router(websocket_router)
-app.include_router(scenarios_router)
-app.include_router(webhooks_router)
-app.include_router(export_router)
-app.include_router(analytics_router)
-app.include_router(reroute_router)
+app.include_router(simple_app_router)
 
 
 @app.get("/health")
