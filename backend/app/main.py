@@ -64,6 +64,7 @@ from app.api import (
     projects_router,
     recommendations_router,
     reports_router,
+    reroute_router,
     routes_router,
     scenarios_router,
     shipments_router,
@@ -224,6 +225,7 @@ app.include_router(scenarios_router)
 app.include_router(webhooks_router)
 app.include_router(export_router)
 app.include_router(analytics_router)
+app.include_router(reroute_router)
 
 
 @app.get("/health")

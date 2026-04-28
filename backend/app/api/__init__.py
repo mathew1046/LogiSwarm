@@ -27,6 +27,7 @@ from app.api.orchestrator import router as orchestrator_router
 from app.api.projects import router as projects_router
 from app.api.recommendations import router as recommendations_router
 from app.api.reports import router as reports_router
+from app.api.reroute import router as reroute_router
 from app.api.routes import router as routes_router
 from app.api.scenarios import router as scenarios_router
 from app.api.shipments import router as shipments_router
@@ -55,4 +56,5 @@ __all__ = [
     "webhooks_router",
     "export_router",
     "analytics_router",
+    "reroute_router",
 ]

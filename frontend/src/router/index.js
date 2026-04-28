@@ -78,6 +78,12 @@ const routes = [
     meta: { title: 'Agent Map' }
   },
   {
+    path: '/reroute',
+    name: 'reroute',
+    component: () => import('../views/RerouteView.vue'),
+    meta: { title: 'Reroute Decision Support' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../views/NotFoundView.vue'),

@@ -28,7 +28,8 @@ const navSections = [
       { path: '/projects/:id', label: 'Dashboard', icon: 'dashboard', requiresProject: true },
       { path: '/projects/:id/map', label: 'Risk Map', icon: 'map', requiresProject: true },
       { path: '/projects/:id/reports', label: 'Reports', icon: 'reports', requiresProject: true },
-      { path: '/projects/:id/interact', label: 'Interact', icon: 'chat', requiresProject: true }
+      { path: '/projects/:id/interact', label: 'Interact', icon: 'chat', requiresProject: true },
+      { path: '/reroute', label: 'Reroute', icon: 'reroute' }
     ]
   }
 ]
@@ -67,6 +68,7 @@ const iconPaths = {
   map: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
   reports: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
   chat: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  reroute: 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6',
   chevron: 'M9 5l7 7-7 7'
 }
 </script>
