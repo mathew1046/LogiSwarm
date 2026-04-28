@@ -174,6 +174,20 @@ class SwarmOrchestrator:
             payload=payload,
         )
 
+    @staticmethod
+    def _normalize_trigger_region(region_id: str) -> str:
+        alias_map = {
+            "choke_suez": "gulf_suez",
+            "choke_bab_el_mandeb": "gulf_suez",
+            "choke_hormuz": "gulf_suez",
+            "choke_panama": "latin_america",
+            "choke_malacca": "se_asia",
+            "choke_lombok": "se_asia",
+            "choke_gibraltar": "europe",
+            "choke_bosporus": "europe",
+        }
+        return alias_map.get(region_id, region_id)
+
     async def run_simulation(
         self,
         *,
@@ -209,7 +223,7 @@ class SwarmOrchestrator:
             end_date = historical.date_end
 
         propagation_impact: dict[str, Any] | None = None
-        trigger_region = historical.trigger_region if historical else scenario
+        trigger_region = self._normalize_trigger_region(historical.trigger_region if historical else scenario)
         severity = historical.severity if historical else "HIGH"
 
         try:

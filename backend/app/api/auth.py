@@ -112,6 +112,22 @@ async def get_current_user(
     if payload is None:
         return None
 
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        return None
+
+    db_user = await session.get(User, user_uuid)
+    if db_user is None or not db_user.is_active:
+        return None
+
+    payload["role"] = db_user.role
+    payload["email"] = db_user.email
+
     return TokenPayload(payload)
 
 
