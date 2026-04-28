@@ -16,6 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
 
 export const useRerouteStore = defineStore('reroute', () => {
   // State
@@ -85,9 +86,10 @@ export const useRerouteStore = defineStore('reroute', () => {
     error.value = null
     executionResult.value = null
     try {
+      const authStore = useAuthStore()
       const response = await fetch('/api/reroute/execute', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authStore.getAuthHeaders() },
         body: JSON.stringify({
           analysis_id: analysisId,
           shipment_ref: shipmentRef,

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const routes = [
   {
@@ -22,6 +23,12 @@ const routes = [
     name: 'home',
     component: () => import('../views/HomeView.vue'),
     meta: { title: 'LogiSwarm - Supply Chain Intelligence' }
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/LoginView.vue'),
+    meta: { title: 'Sign In', public: true }
   },
   {
     path: '/projects',
@@ -33,7 +40,7 @@ const routes = [
     path: '/projects/new',
     name: 'project-new',
     component: () => import('../views/ProjectCreateView.vue'),
-    meta: { title: 'New Project' }
+    meta: { title: 'New Project', requiresAuth: true }
   },
   {
     path: '/projects/:id',
@@ -69,7 +76,7 @@ const routes = [
     path: '/simulation',
     name: 'simulation',
     component: () => import('../views/SimulationView.vue'),
-    meta: { title: 'Simulation' }
+    meta: { title: 'Simulation', requiresAuth: true }
   },
   {
     path: '/agents',
@@ -81,7 +88,7 @@ const routes = [
     path: '/reroute',
     name: 'reroute',
     component: () => import('../views/RerouteView.vue'),
-    meta: { title: 'Reroute Decision Support' }
+    meta: { title: 'Reroute Decision Support', requiresAuth: true }
   },
   {
     path: '/:pathMatch(.*)*',
@@ -98,7 +105,18 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   document.title = to.meta.title || 'LogiSwarm'
-  next()
+
+  const authStore = useAuthStore()
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const isPublic = to.matched.some(record => record.meta.public)
+
+  if (requiresAuth && !authStore.isAuthenticated) {
+    next({ name: 'login', query: { redirect: to.fullPath } })
+  } else if (to.name === 'login' && authStore.isAuthenticated) {
+    next({ name: 'home' })
+  } else {
+    next()
+  }
 })
 
 export default router

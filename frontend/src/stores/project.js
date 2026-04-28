@@ -16,6 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
 
 export const useProjectStore = defineStore('project', () => {
   const projects = ref([])
@@ -65,9 +66,10 @@ export const useProjectStore = defineStore('project', () => {
     loading.value = true
     error.value = null
     try {
+      const authStore = useAuthStore()
       const response = await fetch('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authStore.getAuthHeaders() },
         body: JSON.stringify(projectData)
       })
       const data = await response.json()

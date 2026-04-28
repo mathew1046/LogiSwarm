@@ -21,6 +21,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import ProjectLayout from '@/components/layout/ProjectLayout.vue'
 import { useAgentStore } from '@/stores/agent'
 import { useScenarioStore } from '@/stores/scenario'
+import { useAuthStore } from '@/stores/auth'
 import MetricsSummary from '@/components/scenarios/MetricsSummary.vue'
 import CategoryFilter from '@/components/scenarios/CategoryFilter.vue'
 import ScenarioCard from '@/components/scenarios/ScenarioCard.vue'
@@ -28,6 +29,7 @@ import ScenarioDetailModal from '@/components/scenarios/ScenarioDetailModal.vue'
 
 const agentStore = useAgentStore()
 const scenarioStore = useScenarioStore()
+const authStore = useAuthStore()
 
 const running = ref(false)
 const logEntries = ref([])
@@ -80,7 +82,7 @@ const runSimulation = async (scenario) => {
   try {
     const res = await fetch('/api/orchestrator/simulate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authStore.getAuthHeaders() },
       body: JSON.stringify({
         scenario: scenario.id || scenario.name,
         region_id: region,

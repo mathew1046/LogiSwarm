@@ -1,10 +1,13 @@
 <script setup>
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
 
 const currentProjectName = projectStore.currentProject?.name || 'Select Project'
 
@@ -56,6 +59,15 @@ function toggleSection(section) {
   } else if (section.title === 'Project') {
     projectSectionOpen.value = !projectSectionOpen.value
   }
+}
+
+function handleLogin() {
+  router.push('/login')
+}
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/')
 }
 
 const iconPaths = {
@@ -118,13 +130,43 @@ const iconPaths = {
       </div>
     </nav>
 
-    <div class="sidebar-version">
-      <span class="version-badge">v0.2.0</span>
+    <div class="sidebar-auth">
+      <div v-if="authStore.isAuthenticated" class="auth-info">
+        <div class="auth-user">{{ authStore.displayName }}</div>
+        <button class="btn btn--secondary btn--sm" @click="handleLogout">Sign Out</button>
+      </div>
+      <button v-else class="btn btn--primary btn--sm btn--full" @click="handleLogin">Sign In</button>
     </div>
   </aside>
 </template>
 
 <style scoped>
+.sidebar-auth {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.sidebar-auth .auth-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  align-items: center;
+}
+
+.auth-user {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
+}
+
 .sidebar-version {
   position: absolute;
   bottom: var(--spacing-4);
@@ -132,6 +174,16 @@ const iconPaths = {
   right: 0;
   padding: var(--spacing-4);
   text-align: center;
+}
+
+.btn--sm {
+  padding: var(--spacing-1) var(--spacing-3);
+  font-size: var(--text-xs);
+}
+
+.btn--full {
+  width: 100%;
+  justify-content: center;
 }
 
 .sidebar-collapsible__content {

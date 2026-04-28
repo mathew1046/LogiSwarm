@@ -16,6 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
 
 export const useScenarioStore = defineStore('scenario', () => {
   const scenarios = ref([])
@@ -87,8 +88,10 @@ export const useScenarioStore = defineStore('scenario', () => {
     loading.value = true
     error.value = null
     try {
+      const authStore = useAuthStore()
       const response = await fetch(`/api/scenarios/${scenarioId}/run`, {
-        method: 'POST'
+        method: 'POST',
+        headers: authStore.getAuthHeaders()
       })
       const envelope = await response.json()
       if (envelope.error) {
