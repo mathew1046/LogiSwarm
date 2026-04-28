@@ -21,11 +21,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.auth import require_operator
 from app.api.schemas.projects import Envelope, EnvelopeMeta
 from app.db.session import SessionLocal
 
@@ -76,8 +77,11 @@ _webhook_deliveries: list[dict[str, Any]] = []
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
-@router.post("", response_model=WebhookResponse)
-async def register_webhook(payload: WebhookRegistration) -> WebhookResponse:
+@router.post("", response_model=Envelope)
+async def register_webhook(
+    payload: WebhookRegistration,
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
     """Register a new webhook endpoint to receive disruption events."""
     webhook_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
@@ -93,13 +97,17 @@ async def register_webhook(payload: WebhookRegistration) -> WebhookResponse:
         "failure_count": 0,
     }
 
-    return WebhookResponse(
-        webhook_id=webhook_id,
-        url=payload.url,
-        name=payload.name,
-        event_types=payload.event_types,
-        active=payload.active,
-        created_at=now,
+    return Envelope(
+        data=WebhookResponse(
+            webhook_id=webhook_id,
+            url=payload.url,
+            name=payload.name,
+            event_types=payload.event_types,
+            active=payload.active,
+            created_at=now,
+        ),
+        error=None,
+        meta={"registered": True},
     )
 
 
@@ -132,7 +140,10 @@ async def get_webhook(webhook_id: str) -> Envelope:
 
 
 @router.delete("/{webhook_id}", response_model=Envelope)
-async def delete_webhook(webhook_id: str) -> Envelope:
+async def delete_webhook(
+    webhook_id: str,
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
     """Delete a webhook registration."""
     if webhook_id not in _webhooks_store:
         raise HTTPException(status_code=404, detail=f"Webhook '{webhook_id}' not found")
@@ -142,22 +153,28 @@ async def delete_webhook(webhook_id: str) -> Envelope:
     )
 
 
-@router.put("/{webhook_id}/toggle", response_model=WebhookResponse)
+@router.put("/{webhook_id}/toggle", response_model=Envelope)
 async def toggle_webhook(
-    webhook_id: str, active: bool = Query(default=True)
-) -> WebhookResponse:
+    webhook_id: str,
+    active: bool = Query(default=True),
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
     """Toggle webhook active status."""
     webhook = _webhooks_store.get(webhook_id)
     if webhook is None:
         raise HTTPException(status_code=404, detail=f"Webhook '{webhook_id}' not found")
     webhook["active"] = active
-    return WebhookResponse(
-        webhook_id=webhook_id,
-        url=webhook["url"],
-        name=webhook["name"],
-        event_types=webhook["event_types"],
-        active=webhook["active"],
-        created_at=webhook["created_at"],
+    return Envelope(
+        data=WebhookResponse(
+            webhook_id=webhook_id,
+            url=webhook["url"],
+            name=webhook["name"],
+            event_types=webhook["event_types"],
+            active=webhook["active"],
+            created_at=webhook["created_at"],
+        ),
+        error=None,
+        meta={"toggled": True, "active": active},
     )
 
 
@@ -198,7 +215,7 @@ def build_disruption_payload(event: dict[str, Any]) -> dict[str, Any]:
 export_router = APIRouter(prefix="/export", tags=["export"])
 
 
-@router.get("/disruptions", response_model=Envelope)
+@export_router.get("/disruptions", response_model=Envelope)
 async def export_disruptions(
     start_date: str = Query(default=None, description="Start date (ISO format)"),
     end_date: str = Query(default=None, description="End date (ISO format)"),

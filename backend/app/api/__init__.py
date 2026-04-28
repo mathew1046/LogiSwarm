@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from app.api.actions import router as actions_router
+from app.api.agents_ext import router as agents_ext_router
 from app.api.analytics import router as analytics_router
 from app.api.anomaly import router as anomaly_router
 from app.api.auth import router as auth_router
@@ -37,6 +38,7 @@ __all__ = [
     "projects_router",
     "feeds_router",
     "agents_router",
+    "agents_ext_router",
     "orchestrator_router",
     "actions_router",
     "shipments_router",

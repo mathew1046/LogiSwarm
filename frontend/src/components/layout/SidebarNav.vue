@@ -1,33 +1,15 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
-import { computed } from 'vue'
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
-import { useAlertStore } from '@/stores/alert'
 
 const route = useRoute()
 const projectStore = useProjectStore()
-const alertStore = useAlertStore()
 
-const currentProjectName = computed(() => projectStore.currentProject?.name || 'Select Project')
-const unreadAlerts = computed(() => alertStore.unreadCount)
+const currentProjectName = projectStore.currentProject?.name || 'Select Project'
+
+const overviewSectionOpen = ref(true)
+const projectSectionOpen = ref(true)
 
 const navSections = [
   {
@@ -66,6 +48,14 @@ function getActualPath(itemPath) {
   return itemPath
 }
 
+function toggleSection(section) {
+  if (section.title === 'Overview') {
+    overviewSectionOpen.value = !overviewSectionOpen.value
+  } else if (section.title === 'Project') {
+    projectSectionOpen.value = !projectSectionOpen.value
+  }
+}
+
 const iconPaths = {
   home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
   folder: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
@@ -74,38 +64,56 @@ const iconPaths = {
   dashboard: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z',
   map: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
   reports: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-  chat: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+  chat: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  chevron: 'M9 5l7 7-7 7'
 }
 </script>
 
 <template>
   <aside class="app-layout__sidebar">
     <div class="sidebar-logo">
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <svg class="sidebar-logo__icon" width="28" height="28" viewBox="0 0 32 32" fill="none">
         <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
         <circle cx="16" cy="16" r="6" fill="currentColor"/>
         <path d="M16 2v6M16 24v6M2 16h6M24 16h6" stroke="currentColor" stroke-width="2"/>
       </svg>
       <span class="sidebar-logo__text">LogiSwarm</span>
     </div>
-    
+
     <nav class="sidebar-nav">
       <div v-for="section in navSections" :key="section.title" class="sidebar-section">
-        <div class="sidebar-section__title">{{ section.title }}</div>
-        <router-link
-          v-for="item in section.items"
-          :key="item.path"
-          :to="getActualPath(item.path)"
-          :class="['sidebar-link', { 'sidebar-link--active': isActive(item.path) }]"
+        <div
+          class="sidebar-collapsible"
+          :class="{ 'sidebar-collapsible--open': section.title === 'Overview' ? overviewSectionOpen : projectSectionOpen }"
+          @click="toggleSection(section)"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path :d="iconPaths[item.icon]" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          {{ item.label }}
-        </router-link>
+          <div class="sidebar-collapsible__header">
+            <span class="sidebar-section__title">{{ section.title }}</span>
+            <svg class="sidebar-collapsible__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path :d="iconPaths.chevron" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <div
+          class="sidebar-collapsible__content"
+          :class="{ 'sidebar-collapsible--open': section.title === 'Overview' ? overviewSectionOpen : projectSectionOpen }"
+        >
+          <router-link
+            v-for="item in section.items"
+            :key="item.path"
+            :to="getActualPath(item.path)"
+            :class="['sidebar-link', { 'sidebar-link--active': isActive(item.path) }]"
+          >
+            <svg class="sidebar-link__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path :d="iconPaths[item.icon]" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ item.label }}
+          </router-link>
+        </div>
       </div>
     </nav>
-    
+
     <div class="sidebar-version">
       <span class="version-badge">v0.2.0</span>
     </div>
@@ -120,5 +128,15 @@ const iconPaths = {
   right: 0;
   padding: var(--spacing-4);
   text-align: center;
+}
+
+.sidebar-collapsible__content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-normal);
+}
+
+.sidebar-collapsible--open.sidebar-collapsible__content {
+  max-height: 500px;
 }
 </style>

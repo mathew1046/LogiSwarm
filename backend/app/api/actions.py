@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import parse_qs
 from uuid import UUID
 
@@ -30,6 +31,7 @@ from app.actions.carrier_rebooking import carrier_rebooking_service
 from app.actions.email_notifier import email_notifier
 from app.actions.slack_notifier import slack_notifier
 from app.actions.tms_webhook import TMSWebhookPayload, tms_webhook_client
+from app.api.auth import require_operator
 from app.api.schemas.actions import (
     ActionsEnvelope,
     CarrierRebookingDispatchRequest,
@@ -54,7 +56,10 @@ router = APIRouter(tags=["actions"])
 
 
 @router.post("/actions/tms/reroute", response_model=ActionsEnvelope)
-async def dispatch_tms_reroute(payload: TMSDispatchRequest) -> ActionsEnvelope:
+async def dispatch_tms_reroute(
+    payload: TMSDispatchRequest,
+    _operator: Any = Depends(require_operator),
+) -> ActionsEnvelope:
     """Dispatch signed reroute instruction to configured TMS webhook endpoint."""
     result = await tms_webhook_client.dispatch(payload.payload)
     return ActionsEnvelope(
@@ -65,7 +70,10 @@ async def dispatch_tms_reroute(payload: TMSDispatchRequest) -> ActionsEnvelope:
 
 
 @router.post("/actions/slack/alert", response_model=ActionsEnvelope)
-async def dispatch_slack_alert(payload: SlackDispatchRequest) -> ActionsEnvelope:
+async def dispatch_slack_alert(
+    payload: SlackDispatchRequest,
+    _operator: Any = Depends(require_operator),
+) -> ActionsEnvelope:
     """Dispatch rich disruption alert to Slack webhook."""
     result = await slack_notifier.send_alert(payload.payload)
     return ActionsEnvelope(
@@ -76,7 +84,10 @@ async def dispatch_slack_alert(payload: SlackDispatchRequest) -> ActionsEnvelope
 
 
 @router.post("/actions/email/alert", response_model=ActionsEnvelope)
-async def dispatch_email_alert(payload: EmailDispatchRequest) -> ActionsEnvelope:
+async def dispatch_email_alert(
+    payload: EmailDispatchRequest,
+    _operator: Any = Depends(require_operator),
+) -> ActionsEnvelope:
     """Dispatch disruption alert via HTML email with per-region throttling."""
     result = await email_notifier.send_alert(payload.payload)
     return ActionsEnvelope(
@@ -90,6 +101,7 @@ async def dispatch_email_alert(payload: EmailDispatchRequest) -> ActionsEnvelope
 async def dispatch_carrier_rebooking(
     payload: CarrierRebookingDispatchRequest,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> ActionsEnvelope:
     """Run carrier rebooking automation in recommend or auto-act mode."""
     result = await carrier_rebooking_service.process(payload.payload, session)
@@ -166,6 +178,7 @@ async def mock_tms_webhook(
 async def create_decision_log(
     payload: DecisionCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> ActionsEnvelope:
     """Persist one decision audit log record."""
     row = await decision_audit_service.create_decision(payload.payload, session)

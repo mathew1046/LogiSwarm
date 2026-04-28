@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -31,7 +13,6 @@ const themeStore = useThemeStore()
 
 const currentProject = computed(() => projectStore.currentProject)
 const unreadCount = computed(() => alertStore.unreadCount)
-const isDark = computed(() => themeStore.isDark())
 
 const tourRef = ref(null)
 const showTourButton = ref(false)
@@ -60,7 +41,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <header class="app-layout__topbar">
+  <header class="app-layout__topbar glass">
     <div class="topbar-left">
       <div v-if="currentProject" class="project-selector" @click="goToProjects">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -78,9 +59,9 @@ onMounted(() => {
         <span>New Project</span>
       </div>
     </div>
-    
+
     <div class="topbar-right">
-      <button 
+      <button
         v-if="showTourButton"
         class="btn btn--ghost btn--sm tour-btn"
         @click="startTour"
@@ -92,9 +73,9 @@ onMounted(() => {
           <path d="M12 17h.01"/>
         </svg>
       </button>
-      
-      <button 
-        class="btn btn--secondary btn--sm theme-toggle" 
+
+      <button
+        class="btn btn--ghost btn--sm theme-toggle"
         @click="themeStore.cycleTheme"
         :title="`Theme: ${themeStore.preference}`"
       >
@@ -110,15 +91,15 @@ onMounted(() => {
           <path d="M8 21h8M12 17v4"/>
         </svg>
       </button>
-      
-      <button class="btn btn--secondary btn--sm" @click="alertStore.markAllAsRead" :disabled="unreadCount === 0">
+
+      <button class="btn btn--ghost btn--sm notification-btn" @click="alertStore.markAllAsRead" :disabled="unreadCount === 0">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
       </button>
     </div>
-    
+
     <OnboardingTour ref="tourRef" />
   </header>
 </template>
@@ -137,13 +118,24 @@ onMounted(() => {
   min-width: 36px;
 }
 
+.notification-btn {
+  padding: var(--spacing-2);
+  min-width: 36px;
+  position: relative;
+}
+
 .notification-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   background-color: var(--color-error);
   color: var(--color-text-inverse);
-  font-size: var(--text-xs);
-  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
   border-radius: var(--radius-full);
-  margin-left: var(--spacing-1);
+  min-width: 16px;
+  text-align: center;
 }
 
 .notification-badge:empty {

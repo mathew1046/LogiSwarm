@@ -25,6 +25,12 @@ export const useAgentStore = defineStore('agent', () => {
   const error = ref(null)
   const eventSource = ref(null)
 
+  const tierStats = ref({})
+  const tierHierarchy = ref({})
+  const searchQuery = ref('')
+  const selectedTiers = ref([])
+  const pagination = ref({ total: 0, limit: 50, offset: 0 })
+
   const agentCount = computed(() => agents.value.length)
   const agentsByRegion = computed(() => {
     const map = {}
@@ -33,12 +39,32 @@ export const useAgentStore = defineStore('agent', () => {
     }
     return map
   })
+  const tier1Agents = computed(() => agents.value.filter(a => a.tier === 1 || (!a.tier && ['se_asia','europe','gulf_suez','north_america','china_ea','south_asia','latin_america','africa'].includes(a.region_id))))
+  const tier2Agents = computed(() => agents.value.filter(a => a.tier === 2))
+  const tier3Agents = computed(() => agents.value.filter(a => a.tier === 3))
   const highRiskAgents = computed(() => 
     agents.value.filter(a => 
       a.last_assessment?.severity === 'HIGH' || 
       a.last_assessment?.severity === 'CRITICAL'
     )
   )
+  const degradedAgents = computed(() =>
+    agents.value.filter(a => a.degradation_status?.is_degraded)
+  )
+  const filteredAgents = computed(() => {
+    let filtered = agents.value
+    if (selectedTiers.value.length > 0) {
+      filtered = filtered.filter(a => selectedTiers.value.includes(a.tier || 1))
+    }
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase()
+      filtered = filtered.filter(a => 
+        a.region_id?.toLowerCase().includes(q) ||
+        a.region_name?.toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  })
 
   async function fetchAgents() {
     loading.value = true
@@ -50,10 +76,67 @@ export const useAgentStore = defineStore('agent', () => {
         throw new Error(data.error)
       }
       agents.value = data.data || []
+      pagination.value.total = data.meta?.total || agents.value.length
     } catch (e) {
       error.value = e.message
     } finally {
       loading.value = false
+    }
+  }
+
+  async function fetchFilteredAgents({ tiers = [], search = '', limit = 50, offset = 0 } = {}) {
+    loading.value = true
+    error.value = null
+    try {
+      const params = new URLSearchParams()
+      if (tiers.length > 0) {
+        tiers.forEach(t => params.append('tier', String(t)))
+      }
+      if (search) params.set('search', search)
+      params.set('limit', String(limit))
+      params.set('offset', String(offset))
+      const url = `/api/agents/list?${params.toString()}`
+      const response = await fetch(url)
+      const envelope = await response.json()
+      if (envelope.error) {
+        throw new Error(envelope.error)
+      }
+      return envelope
+    } catch (e) {
+      error.value = e.message
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchAgentStats() {
+    try {
+      const response = await fetch('/api/agents/stats')
+      const data = await response.json()
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      tierStats.value = data.data || {}
+      return data.data
+    } catch (e) {
+      error.value = e.message
+      return null
+    }
+  }
+
+  async function fetchAgentTiers() {
+    try {
+      const response = await fetch('/api/agents/tiers')
+      const data = await response.json()
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      tierHierarchy.value = data.data || {}
+      return data.data
+    } catch (e) {
+      error.value = e.message
+      return null
     }
   }
 
@@ -182,8 +265,21 @@ export const useAgentStore = defineStore('agent', () => {
     error,
     agentCount,
     agentsByRegion,
+    tier1Agents,
+    tier2Agents,
+    tier3Agents,
     highRiskAgents,
+    degradedAgents,
+    filteredAgents,
+    tierStats,
+    tierHierarchy,
+    searchQuery,
+    selectedTiers,
+    pagination,
     fetchAgents,
+    fetchFilteredAgents,
+    fetchAgentStats,
+    fetchAgentTiers,
     fetchAgentStatus,
     fetchAgentConfig,
     updateAgentConfig,

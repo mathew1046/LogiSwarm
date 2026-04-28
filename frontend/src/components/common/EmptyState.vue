@@ -1,45 +1,22 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 defineProps({
   icon: { type: String, default: 'check' },
   title: { type: String, default: 'No data' },
   message: { type: String, default: 'No items to display' }
 })
+
+const iconPaths = {
+  check: 'M22 11.08V12a10 10 0 11-5.17-8.77M22 4L12 14.01 9 11.01',
+  inbox: 'M22 12 16 12 14 15 10 15 8 12 2 12M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z',
+  empty: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'
+}
 </script>
 
 <template>
   <div class="empty-state">
     <div class="empty-icon">
-      <svg v-if="icon === 'check'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 11.08V12a10 10 0 11-5.17-8.77"/>
-        <polyline points="22 4 12 14.01 9 11.01"/>
-      </svg>
-      <svg v-else-if="icon === 'inbox'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
-        <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>
-      </svg>
-      <svg v-else width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-        <line x1="9" y1="9" x2="9.01" y2="9"/>
-        <line x1="15" y1="9" x2="15.01" y2="9"/>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path :d="iconPaths[icon] || iconPaths.empty" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
     <h3 class="empty-title">{{ title }}</h3>
@@ -58,20 +35,22 @@ defineProps({
 }
 
 .empty-icon {
-  color: var(--color-success);
+  color: var(--color-text-tertiary);
   margin-bottom: var(--spacing-4);
+  opacity: 0.5;
 }
 
 .empty-title {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 600;
   margin-bottom: var(--spacing-2);
   color: var(--color-text);
 }
 
 .empty-message {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
-  max-width: 400px;
+  max-width: 300px;
+  line-height: var(--leading-relaxed);
 }
 </style>

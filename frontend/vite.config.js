@@ -36,10 +36,18 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-vue': ['vue', 'vue-router', 'pinia'],
-          'vendor-d3': ['d3'],
-          'vendor-leaflet': ['leaflet'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia')) {
+              return 'vendor-vue'
+            }
+            if (id.includes('d3')) {
+              return 'vendor-d3'
+            }
+            if (id.includes('leaflet')) {
+              return 'vendor-leaflet'
+            }
+          }
         }
       }
     }

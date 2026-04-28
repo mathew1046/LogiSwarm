@@ -22,10 +22,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.agent_manager import NEIGHBOR_MAP, agent_manager
+from app.api.auth import require_operator
 from app.bus.publisher import publish
 from app.db.models import DisruptionEvent
 from app.db.session import get_db_session
@@ -90,23 +91,29 @@ async def list_disruptions(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
 ) -> DisruptionEnvelope:
-    """List disruption events with optional filtering."""
+    """List disruption events with optional filtering and pagination."""
+    total_stmt = select(func.count()).select_from(DisruptionEvent)
     stmt = select(DisruptionEvent)
 
     if severity:
+        total_stmt = total_stmt.where(DisruptionEvent.severity == severity.upper())
         stmt = stmt.where(DisruptionEvent.severity == severity.upper())
     if region_id:
         try:
             region_uuid = UUID(region_id)
+            total_stmt = total_stmt.where(DisruptionEvent.region_id == region_uuid)
             stmt = stmt.where(DisruptionEvent.region_id == region_uuid)
         except ValueError:
             pass
     if resolved is not None:
         if resolved:
+            total_stmt = total_stmt.where(DisruptionEvent.resolved_at.is_not(None))
             stmt = stmt.where(DisruptionEvent.resolved_at.is_not(None))
         else:
+            total_stmt = total_stmt.where(DisruptionEvent.resolved_at.is_(None))
             stmt = stmt.where(DisruptionEvent.resolved_at.is_(None))
 
+    total = (await session.execute(total_stmt)).scalar_one()
     stmt = stmt.order_by(DisruptionEvent.detected_at.desc()).limit(limit).offset(offset)
 
     result = await session.execute(stmt)
@@ -115,7 +122,7 @@ async def list_disruptions(
     return DisruptionEnvelope(
         data=[DisruptionResponse.model_validate(d) for d in disruptions],
         error=None,
-        meta={"limit": limit, "offset": offset},
+        meta={"total": total, "limit": limit, "offset": offset},
     )
 
 
@@ -141,6 +148,7 @@ async def resolve_disruption(
     disruption_id: UUID,
     payload: ResolveDisruptionRequest,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> DisruptionEnvelope:
     """
     Mark a disruption as resolved and trigger graph memory update.

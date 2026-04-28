@@ -14,8 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Any
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.api.auth import require_operator
 from app.api.schemas.projects import Envelope, EnvelopeMeta
 from app.orchestrator.scenario_builder import (
     Scenario,
@@ -31,7 +34,10 @@ scenario_builder = ScenarioBuilder()
 
 
 @router.post("", response_model=Envelope)
-async def create_scenario(payload: ScenarioCreate) -> Envelope:
+async def create_scenario(
+    payload: ScenarioCreate,
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
     """Create a new what-if disruption scenario and compute propagation impact."""
     scenario = scenario_builder.create_scenario(payload)
     return Envelope(
@@ -67,7 +73,11 @@ async def get_scenario(scenario_id: str) -> Envelope:
 
 
 @router.post("/{scenario_id}/mitigation", response_model=Envelope)
-async def add_mitigation(scenario_id: str, payload: ScenarioMitigation) -> Envelope:
+async def add_mitigation(
+    scenario_id: str,
+    payload: ScenarioMitigation,
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
     """Add a mitigation strategy to a scenario and compute mitigated impact."""
     scenario = scenario_builder.add_mitigation(scenario_id, payload)
     if scenario is None:
@@ -94,7 +104,10 @@ async def compare_scenario_impact(scenario_id: str) -> Envelope:
 
 
 @router.delete("/{scenario_id}", response_model=Envelope)
-async def delete_scenario(scenario_id: str) -> Envelope:
+async def delete_scenario(
+    scenario_id: str,
+    _operator: Any = Depends(require_operator),
+) -> Envelope:
     """Delete a scenario."""
     deleted = scenario_store.delete(scenario_id)
     if not deleted:

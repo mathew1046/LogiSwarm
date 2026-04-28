@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import require_operator
 from app.db.models import Route
 from app.db.session import get_db_session
 
@@ -414,6 +415,7 @@ async def list_routes(
 async def create_route(
     payload: RouteCreate,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> RouteEnvelope:
     """Add a new route (sea lane, air, or rail) with GeoJSON path."""
     record = Route(
@@ -455,6 +457,7 @@ async def disable_route(
     route_id: UUID,
     payload: RouteDisablePayload,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> RouteEnvelope:
     """Mark a route as disrupted (manual override)."""
     record = await session.get(Route, route_id)
@@ -476,6 +479,7 @@ async def disable_route(
 async def enable_route(
     route_id: UUID,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> RouteEnvelope:
     """Re-enable a previously disrupted route."""
     record = await session.get(Route, route_id)

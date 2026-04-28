@@ -51,6 +51,7 @@ from app.middleware import RequestIDMiddleware, SecurityHeadersMiddleware
 from app.agents.agent_manager import agent_manager
 from app.api import (
     actions_router,
+    agents_ext_router,
     agents_router,
     analytics_router,
     anomaly_router,
@@ -206,6 +207,7 @@ app.add_exception_handler(Exception, generic_exception_handler)
 app.include_router(projects_router)
 app.include_router(feeds_router)
 app.include_router(agents_router)
+app.include_router(agents_ext_router)
 app.include_router(orchestrator_router)
 app.include_router(actions_router)
 app.include_router(shipments_router)

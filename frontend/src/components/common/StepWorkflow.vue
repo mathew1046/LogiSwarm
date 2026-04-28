@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { computed } from 'vue'
 
@@ -54,12 +36,12 @@ function getStepStatus(stepId) {
   <div class="step-workflow">
     <div class="step-pills">
       <template v-for="(step, index) in steps" :key="step.id">
-        <div 
+        <div
           :class="['step-pill', getStepStatus(step.id)]"
           :title="step.label"
         >
           <div class="step-pill__icon">
-            <svg v-if="getStepStatus(step.id) === 'completed'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <svg v-if="getStepStatus(step.id) === 'completed'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
               <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span v-else>{{ index + 1 }}</span>
@@ -87,8 +69,8 @@ function getStepStatus(stepId) {
 .step-pills {
   display: flex;
   align-items: center;
-  padding: var(--spacing-4);
-  background-color: var(--color-surface);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   overflow-x: auto;
   flex-shrink: 0;
@@ -99,16 +81,18 @@ function getStepStatus(stepId) {
   align-items: center;
   gap: var(--spacing-2);
   padding: var(--spacing-2) var(--spacing-3);
-  border-radius: var(--radius-full);
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
   transition: all var(--transition-fast);
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
 .step-pill.active {
-  background-color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
   color: var(--color-text-inverse);
+  box-shadow: var(--shadow-primary);
 }
 
 .step-pill.completed {
@@ -117,13 +101,13 @@ function getStepStatus(stepId) {
 }
 
 .step-pill__icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.15);
   font-size: var(--text-xs);
   font-weight: 600;
 }
@@ -136,11 +120,11 @@ function getStepStatus(stepId) {
 .step-connector {
   display: flex;
   align-items: center;
-  padding: 0 var(--spacing-2);
+  padding: 0 var(--spacing-1);
 }
 
 .step-connector__line {
-  width: 24px;
+  width: 20px;
   height: 2px;
   background-color: var(--color-border);
   transition: background-color var(--transition-fast);

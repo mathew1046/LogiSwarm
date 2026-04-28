@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -44,13 +26,31 @@ const currentProject = computed(() => projectStore.currentProject)
 const agents = computed(() => agentStore.agents)
 const highRiskAgents = computed(() => agentStore.highRiskAgents)
 
-function getSeverityBadgeClass(severity) {
+function getSeverityClass(severity) {
   const s = (severity || 'low').toLowerCase()
   return `badge--${s}`
 }
 
+function getSeverityColor(severity) {
+  const colors = {
+    low: 'var(--color-low)',
+    medium: 'var(--color-medium)',
+    high: 'var(--color-high)',
+    critical: 'var(--color-critical)'
+  }
+  return colors[(severity || 'low').toLowerCase()] || colors.low
+}
+
+function getRiskCardClass(severity) {
+  return `risk-${(severity || 'low').toLowerCase()}`
+}
+
 function formatDate(date) {
   return new Date(date).toLocaleString()
+}
+
+function getConfidencePercent(confidence) {
+  return ((confidence || 0) * 100).toFixed(1)
 }
 
 onMounted(async () => {
@@ -63,7 +63,7 @@ onMounted(async () => {
 function goToStep(stepId) {
   const currentIndex = steps.findIndex(s => s.id === activeStep.value)
   const targetIndex = steps.findIndex(s => s.id === stepId)
-  
+
   if (targetIndex <= currentIndex || completedSteps.value.includes(stepId)) {
     activeStep.value = stepId
   }
@@ -88,7 +88,9 @@ function goToReports() {
       <header class="project-header">
         <div class="project-header__title">
           <h1>{{ currentProject?.name || 'Project Dashboard' }}</h1>
-          <span class="badge badge--low">{{ currentProject?.status || 'idle' }}</span>
+          <span :class="['badge', getSeverityClass(currentProject?.status)]">
+            {{ currentProject?.status || 'idle' }}
+          </span>
         </div>
         <div class="project-header__actions">
           <button class="btn btn--secondary btn--sm" @click="goToMap">
@@ -106,29 +108,28 @@ function goToReports() {
         </div>
       </header>
 
-      <StepWorkflow 
-        :steps="steps" 
-        :active-step="activeStep" 
+      <StepWorkflow
+        :steps="steps"
+        :active-step="activeStep"
         :completed-steps="completedSteps"
       >
         <div class="step-panel">
-          <!-- Setup Step -->
           <div v-if="activeStep === 'setup'" class="step-section">
             <h2>Setup</h2>
             <p class="text-secondary">Configure your monitoring regions and thresholds.</p>
-            
-            <div class="setup-summary card">
+
+            <div class="setup-summary card card--glass">
               <h3>Configuration</h3>
               <div class="config-grid">
                 <div class="config-item">
                   <span class="config-label">Monitored Regions</span>
-                  <span class="config-value">{{ currentProject?.config?.regions?.length || 0 }} regions</span>
+                  <span class="config-value text-mono">{{ currentProject?.config?.regions?.length || 0 }} regions</span>
                 </div>
                 <div class="config-item">
                   <span class="config-label">Average Threshold</span>
-                  <span class="config-value">
-                    {{ currentProject?.config?.thresholds ? 
-                      (Object.values(currentProject.config.thresholds).reduce((a, b) => a + b, 0) / Object.keys(currentProject.config.thresholds).length).toFixed(2) : 
+                  <span class="config-value text-mono">
+                    {{ currentProject?.config?.thresholds ?
+                      (Object.values(currentProject.config.thresholds).reduce((a, b) => a + b, 0) / Object.keys(currentProject.config.thresholds).length).toFixed(2) :
                       '0.75' }}
                   </span>
                 </div>
@@ -136,50 +137,55 @@ function goToReports() {
             </div>
           </div>
 
-          <!-- Monitoring Step -->
           <div v-else-if="activeStep === 'monitoring'" class="step-section">
             <h2>Agent Monitoring</h2>
             <p class="text-secondary">Live status of all geo-agents monitoring your supply chain.</p>
-            
+
             <div v-if="agentStore.loading" class="loading">
               <div class="loading__spinner"></div>
             </div>
-            
+
             <div v-else class="agents-grid">
-              <div v-for="agent in agents" :key="agent.region_id" class="agent-card card">
+              <div
+                v-for="agent in agents"
+                :key="agent.region_id"
+                :class="['agent-card', 'card', 'card--glass', getRiskCardClass(agent.last_assessment?.severity)]"
+              >
                 <div class="agent-card__header">
                   <h3>{{ agent.region_name }}</h3>
-                  <span :class="['badge', getSeverityBadgeClass(agent.last_assessment?.severity)]">
+                  <span :class="['badge', getSeverityClass(agent.last_assessment?.severity)]">
                     {{ agent.last_assessment?.severity || 'LOW' }}
                   </span>
                 </div>
                 <div class="agent-card__stats">
                   <div class="stat">
                     <span class="stat__label">Confidence</span>
-                    <span class="stat__value">
-                      {{ ((agent.last_assessment?.confidence || 0) * 100).toFixed(1) }}%
+                    <span class="stat__value text-mono">
+                      {{ getConfidencePercent(agent.last_assessment?.confidence) }}%
                     </span>
                   </div>
                   <div class="stat">
                     <span class="stat__label">Status</span>
-                    <span class="stat__value">{{ agent.running ? 'Running' : 'Stopped' }}</span>
+                    <span class="stat__value">
+                      <span :class="['status-dot', { 'status-dot--active': agent.running }]"></span>
+                      {{ agent.running ? 'Running' : 'Stopped' }}
+                    </span>
                   </div>
                 </div>
                 <div class="agent-card__reasoning" v-if="agent.last_assessment?.reasoning">
                   <p>{{ agent.last_assessment.reasoning }}</p>
                 </div>
-                <div class="agent-card__time">
+                <div class="agent-card__time text-mono">
                   Last cycle: {{ agent.last_cycle_at ? formatDate(agent.last_cycle_at) : 'Never' }}
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Disruption Step -->
           <div v-else-if="activeStep === 'disruption'" class="step-section">
             <h2>Active Disruptions</h2>
             <p class="text-secondary">Current disruptions detected across your monitored regions.</p>
-            
+
             <div v-if="highRiskAgents.length === 0" class="empty-state">
               <div class="success-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -189,12 +195,16 @@ function goToReports() {
               <p class="empty-state__title">No Active Disruptions</p>
               <p class="empty-state__text">All regions are operating normally. No disruptions have been detected.</p>
             </div>
-            
+
             <div v-else class="disruptions-list">
-              <div v-for="agent in highRiskAgents" :key="agent.region_id" class="disruption-card card">
+              <div
+                v-for="agent in highRiskAgents"
+                :key="agent.region_id"
+                :class="['disruption-card', 'card', 'card--glass', getRiskCardClass(agent.last_assessment?.severity)]"
+              >
                 <div class="disruption-header">
                   <h3>{{ agent.region_name }}</h3>
-                  <span :class="['badge', getSeverityBadgeClass(agent.last_assessment?.severity)]">
+                  <span :class="['badge', getSeverityClass(agent.last_assessment?.severity)]">
                     {{ agent.last_assessment?.severity }}
                   </span>
                 </div>
@@ -211,19 +221,18 @@ function goToReports() {
             </div>
           </div>
 
-          <!-- Response Step -->
           <div v-else-if="activeStep === 'response'" class="step-section">
             <h2>Response Actions</h2>
             <p class="text-secondary">Recommended and automated responses to detected disruptions.</p>
-            
+
             <div class="response-grid">
-              <div class="response-card card">
+              <div class="response-card card card--glass">
                 <h3>Pending Actions</h3>
                 <div class="empty-state">
                   <p class="text-secondary">No pending actions at this time.</p>
                 </div>
               </div>
-              <div class="response-card card">
+              <div class="response-card card card--glass">
                 <h3>Completed Actions</h3>
                 <div class="empty-state">
                   <p class="text-secondary">No completed actions yet.</p>
@@ -232,12 +241,11 @@ function goToReports() {
             </div>
           </div>
 
-          <!-- Report Step -->
           <div v-else-if="activeStep === 'report'" class="step-section">
             <h2>Reports</h2>
             <p class="text-secondary">Post-disruption analysis reports and insights.</p>
-            
-            <div class="reports-placeholder card">
+
+            <div class="reports-placeholder card card--glass">
               <button class="btn btn--primary" @click="goToReports">
                 View All Reports
               </button>
@@ -271,6 +279,8 @@ function goToReports() {
 
 .project-header__title h1 {
   margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 600;
 }
 
 .project-header__actions {
@@ -279,11 +289,13 @@ function goToReports() {
 }
 
 .step-section {
-  padding: var(--spacing-6);
+  padding: var(--spacing-6) 0;
 }
 
 .step-section h2 {
   margin-bottom: var(--spacing-2);
+  font-size: var(--text-xl);
+  font-weight: 600;
 }
 
 .text-secondary {
@@ -292,7 +304,7 @@ function goToReports() {
 }
 
 .setup-summary {
-  background-color: var(--color-surface);
+  background: var(--color-bg-secondary);
 }
 
 .config-grid {
@@ -325,7 +337,7 @@ function goToReports() {
 }
 
 .agent-card {
-  background-color: var(--color-surface);
+  padding: var(--spacing-4);
 }
 
 .agent-card__header {
@@ -360,15 +372,19 @@ function goToReports() {
 .stat__value {
   font-size: var(--text-sm);
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
 }
 
 .agent-card__reasoning {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   padding: var(--spacing-2);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-tertiary);
   border-radius: var(--radius-md);
   margin-bottom: var(--spacing-3);
+  line-height: var(--leading-relaxed);
 }
 
 .agent-card__time {
@@ -383,7 +399,7 @@ function goToReports() {
 }
 
 .disruption-card {
-  border-left: 4px solid var(--color-high);
+  padding: var(--spacing-5);
 }
 
 .disruption-header {
@@ -400,11 +416,13 @@ function goToReports() {
 .disruption-reasoning {
   color: var(--color-text-secondary);
   margin-bottom: var(--spacing-3);
+  line-height: var(--leading-relaxed);
 }
 
 .disruption-actions h4 {
   font-size: var(--text-sm);
   margin-bottom: var(--spacing-2);
+  color: var(--color-text-secondary);
 }
 
 .disruption-actions ul {
@@ -416,6 +434,7 @@ function goToReports() {
 .disruption-actions li {
   font-size: var(--text-sm);
   margin-bottom: var(--spacing-1);
+  color: var(--color-text);
 }
 
 .response-grid {
@@ -426,6 +445,7 @@ function goToReports() {
 
 .response-card h3 {
   margin-bottom: var(--spacing-4);
+  font-size: var(--text-base);
 }
 
 .reports-placeholder {

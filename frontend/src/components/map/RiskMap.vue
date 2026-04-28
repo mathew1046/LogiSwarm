@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useAgentStore } from '@/stores/agent'
@@ -88,7 +70,7 @@ function darkenColor(hex, factor) {
 
 function initMap() {
   if (!mapContainer.value || typeof window === 'undefined') return
-  
+
   const L = window.L
   if (!L) return
 
@@ -105,14 +87,14 @@ function initMap() {
 
 function updateBaseLayer() {
   if (!map.value || typeof window === 'undefined') return
-  
+
   const L = window.L
   if (!L) return
-  
+
   if (baseLayer.value) {
     map.value.removeLayer(baseLayer.value)
   }
-  
+
   if (isDark.value) {
     baseLayer.value = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -126,13 +108,13 @@ function updateBaseLayer() {
       noWrap: true
     })
   }
-  
+
   baseLayer.value.addTo(map.value)
 }
 
 function updateRegions() {
   if (!map.value || typeof window === 'undefined') return
-  
+
   const L = window.L
   if (!L) return
 
@@ -185,7 +167,7 @@ watch(isDark, () => {
 
 onMounted(async () => {
   await agentStore.fetchRiskMap()
-  
+
   if (typeof window !== 'undefined') {
     const existingScript = document.querySelector('script[src*="leaflet"]')
     if (!existingScript) {
@@ -214,43 +196,47 @@ onUnmounted(() => {
 
 <template>
   <div class="risk-map">
-    <div class="map-header">
+    <div class="map-header glass">
       <h2>Global Risk Map</h2>
       <div class="map-legend">
         <span class="legend-item">
-          <span class="legend-color" style="background: #22c55e;"></span>
-          Low
+          <span class="legend-color legend-color--low"></span>
+          <span class="legend-label">Low</span>
         </span>
         <span class="legend-item">
-          <span class="legend-color" style="background: #f59e0b;"></span>
-          Medium
+          <span class="legend-color legend-color--medium"></span>
+          <span class="legend-label">Medium</span>
         </span>
         <span class="legend-item">
-          <span class="legend-color" style="background: #f97316;"></span>
-          High
+          <span class="legend-color legend-color--high"></span>
+          <span class="legend-label">High</span>
         </span>
         <span class="legend-item">
-          <span class="legend-color" style="background: #ef4444;"></span>
-          Critical
+          <span class="legend-color legend-color--critical"></span>
+          <span class="legend-label">Critical</span>
         </span>
       </div>
     </div>
-    
+
     <div ref="mapContainer" class="map-container"></div>
-    
-    <div v-if="selectedRegion" class="region-detail card">
-      <button class="close-btn" @click="selectedRegion = null">×</button>
+
+    <div v-if="selectedRegion" class="region-detail card card--glass">
+      <button class="close-btn" @click="selectedRegion = null">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <h3>{{ REGIONS[selectedRegion]?.name || selectedRegion }}</h3>
       <div class="detail-stats">
         <div class="stat-row">
           <span class="stat-label">Risk Level:</span>
-          <span :class="['stat-value', 'severity--' + (riskMap[selectedRegion]?.severity || 'low').toLowerCase()]">
+          <span :class="['badge', `badge--${(riskMap[selectedRegion]?.severity || 'low').toLowerCase()}`]">
             {{ (riskMap[selectedRegion]?.severity || 'LOW').toUpperCase() }}
           </span>
         </div>
         <div class="stat-row">
           <span class="stat-label">Confidence:</span>
-          <span class="stat-value">{{ ((riskMap[selectedRegion]?.confidence || 0) * 100).toFixed(1) }}%</span>
+          <span class="stat-value text-mono">{{ ((riskMap[selectedRegion]?.confidence || 0) * 100).toFixed(1) }}%</span>
         </div>
         <div v-if="riskMap[selectedRegion]?.reasoning" class="stat-row stat-row--full">
           <span class="stat-label">Analysis:</span>
@@ -273,13 +259,15 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-4);
-  background-color: var(--color-surface);
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: 1px solid var(--color-border);
+  z-index: 10;
 }
 
 .map-header h2 {
   margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
 }
 
 .map-legend {
@@ -290,20 +278,50 @@ onUnmounted(() => {
 .legend-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-1);
-  font-size: var(--text-sm);
+  gap: var(--spacing-2);
 }
 
 .legend-color {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: var(--radius-sm);
+}
+
+.legend-color--low {
+  background: var(--color-low);
+  box-shadow: 0 0 6px var(--color-low-glow);
+}
+
+.legend-color--medium {
+  background: var(--color-medium);
+  box-shadow: 0 0 6px var(--color-medium-glow);
+}
+
+.legend-color--high {
+  background: var(--color-high);
+  box-shadow: 0 0 6px var(--color-high-glow);
+}
+
+.legend-color--critical {
+  background: var(--color-critical);
+  box-shadow: 0 0 6px var(--color-critical-glow);
+  animation: criticalPulse 2s infinite;
+}
+
+@keyframes criticalPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.legend-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
 .map-container {
   flex: 1;
   min-height: 400px;
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg);
 }
 
 .region-detail {
@@ -311,42 +329,45 @@ onUnmounted(() => {
   bottom: var(--spacing-4);
   right: var(--spacing-4);
   width: 300px;
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
-  background-color: var(--color-surface);
   z-index: 1000;
+  animation: fadeIn 200ms ease;
 }
 
 .close-btn {
   position: absolute;
   top: var(--spacing-2);
   right: var(--spacing-2);
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-bg-secondary);
-  border: none;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   cursor: pointer;
-  font-size: var(--text-lg);
   color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
 }
 
 .close-btn:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text);
 }
 
 .region-detail h3 {
   margin: 0 0 var(--spacing-3);
   padding-right: var(--spacing-6);
+  font-size: var(--text-lg);
+  font-weight: 600;
 }
 
 .detail-stats {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  gap: var(--spacing-3);
 }
 
 .stat-row {
@@ -373,10 +394,17 @@ onUnmounted(() => {
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
   margin: var(--spacing-1) 0 0;
+  color: var(--color-text);
 }
 
-.severity--low { color: var(--color-low); }
-.severity--medium { color: var(--color-medium); }
-.severity--high { color: var(--color-high); }
-.severity--critical { color: var(--color-critical); }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 </style>

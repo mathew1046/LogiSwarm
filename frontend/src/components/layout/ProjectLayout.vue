@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -35,11 +17,11 @@ const feedStore = useFeedStore()
 
 onMounted(async () => {
   alertStore.initialize()
-  
+
   if (route.params.id) {
     await projectStore.fetchProject(route.params.id)
   }
-  
+
   agentStore.connectToSSE()
   await feedStore.fetchDegradationStatus()
 })
@@ -61,3 +43,26 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+}
+
+.app-layout__main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-layout__content {
+  flex: 1;
+  padding: var(--spacing-6);
+  overflow-y: auto;
+  background-color: var(--color-bg);
+}
+</style>

@@ -16,8 +16,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from typing import Any
 
+from fastapi import APIRouter, Depends, Query
+
+from app.api.auth import require_operator
 from app.api.schemas.orchestrator import (
     CascadeRiskRequest,
     EscalationRequest,
@@ -30,7 +33,11 @@ router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 
 
 @router.post("/cascade-risk", response_model=OrchestratorEnvelope)
-async def cascade_risk(payload: CascadeRiskRequest) -> OrchestratorEnvelope:
+async def cascade_risk(
+    payload: CascadeRiskRequest,
+    _operator: Any = Depends(require_operator),
+) -> OrchestratorEnvelope:
+    """Compute cascade risk propagation from a trigger region."""
     result = swarm_orchestrator.cascade_risk(
         trigger_region=payload.trigger_region,
         severity=payload.severity,
@@ -51,7 +58,11 @@ async def risk_map_history(hours: int = Query(default=24, ge=1, le=168)) -> Orch
 
 
 @router.post("/escalation", response_model=OrchestratorEnvelope)
-async def evaluate_escalation(payload: EscalationRequest) -> OrchestratorEnvelope:
+async def evaluate_escalation(
+    payload: EscalationRequest,
+    _operator: Any = Depends(require_operator),
+) -> OrchestratorEnvelope:
+    """Evaluate escalation decision based on confidence and region thresholds."""
     decision = swarm_orchestrator.evaluate_escalation(
         region_id=payload.region_id,
         confidence=payload.confidence,
@@ -61,7 +72,11 @@ async def evaluate_escalation(payload: EscalationRequest) -> OrchestratorEnvelop
 
 
 @router.post("/simulate", response_model=OrchestratorEnvelope)
-async def simulate(payload: SimulateRequest) -> OrchestratorEnvelope:
+async def simulate(
+    payload: SimulateRequest,
+    _operator: Any = Depends(require_operator),
+) -> OrchestratorEnvelope:
+    """Run a historical disruption simulation scenario."""
     report = await swarm_orchestrator.run_simulation(
         scenario=payload.scenario,
         start_date=payload.start_date,

@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.agent_manager import agent_manager
 from app.agents.timeseries_state import TimeseriesState
+from app.api.auth import require_operator
 from app.db.session import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,7 @@ async def get_anomaly_config(region_id: str) -> AnomalyConfigResponse:
 async def update_anomaly_config(
     region_id: str,
     payload: AnomalyConfigUpdate,
+    _operator: Any = Depends(require_operator),
 ) -> AnomalyConfigResponse:
     """Update anomaly detection thresholds and configuration for a region."""
     try:
@@ -307,6 +309,7 @@ async def mark_anomaly_false_positive(
     region_id: str,
     anomaly_id: str,
     payload: FalsePositiveMarkRequest,
+    _operator: Any = Depends(require_operator),
 ) -> FalsePositiveMarkResponse:
     """Mark an anomaly as false positive and adjust threshold (adaptive tuning)."""
     try:

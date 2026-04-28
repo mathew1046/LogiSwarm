@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import require_operator
 from app.db.models import Report
 from app.db.session import get_db_session
 from app.report.report_agent import report_agent
@@ -82,6 +83,7 @@ class ReportEnvelope(BaseModel):
 async def generate_report(
     payload: ReportCreate,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> ReportEnvelope:
     """Generate a new post-disruption analysis report in the specified language."""
     language = (

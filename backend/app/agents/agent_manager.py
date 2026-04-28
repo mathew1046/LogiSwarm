@@ -65,6 +65,29 @@ NEIGHBOR_MAP: dict[str, list[str]] = {
 }
 
 
+def _compute_proximity_neighbors(region_id: str, config: dict[str, Any], all_configs: dict[str, dict[str, Any]], max_neighbors: int = 6, distance_threshold: float = 40.0) -> list[str]:
+    lon_min, lat_min, lon_max, lat_max = config["bbox"]
+    center_lon = (lon_min + lon_max) / 2
+    center_lat = (lat_min + lat_max) / 2
+    neighbors_with_dist: list[tuple[float, str]] = []
+    for rid, rcfg in all_configs.items():
+        if rid == region_id:
+            continue
+        r_lon_min, r_lat_min, r_lon_max, r_lat_max = rcfg["bbox"]
+        r_center_lon = (r_lon_min + r_lon_max) / 2
+        r_center_lat = (r_lat_min + r_lat_max) / 2
+        dlat = r_center_lat - center_lat
+        dlon = (r_center_lon - center_lon) * max(0.5, abs(center_lat) / 90.0 * 0.5 + 0.5)
+        dist = (dlat ** 2 + dlon ** 2) ** 0.5
+        if rid in NEIGHBOR_MAP.get(region_id, []):
+            dist -= 15.0
+        if rcfg.get("parent_region") == region_id or config.get("parent_region") == rid:
+            dist -= 10.0
+        neighbors_with_dist.append((dist, rid))
+    neighbors_with_dist.sort()
+    return [rid for dist, rid in neighbors_with_dist[:max_neighbors]]
+
+
 class Envelope(BaseModel):
     """Standard API envelope for agent manager responses."""
 
@@ -118,14 +141,12 @@ class AgentManager:
         self.llm_client = llm_client or ClaudeReasoningCore()
         self.zep_client = zep_client or ZepEpisodicMemory()
         self.agents: dict[str, GeoAgent] = {}
+        self._instantiate_agents()
 
     async def start_all(self) -> None:
-        """Instantiate and start all core Tier-1 geo-agents."""
+        """Start all geo-agents (they're already instantiated in __init__)."""
         if not self.agents:
             self._instantiate_agents()
-
-        for region_id, neighbors in NEIGHBOR_MAP.items():
-            self.agents[region_id].set_neighbors(neighbors)
 
         for agent in self.agents.values():
             await agent.start()
@@ -137,7 +158,16 @@ class AgentManager:
 
     def list_agents(self) -> list[dict[str, Any]]:
         """Return concise runtime status for all agents."""
-        return [self._status_payload(agent) for agent in self.agents.values()]
+        from app.agents.agent_registry import AGENT_REGISTRY
+        results = []
+        for agent in self.agents.values():
+            payload = self._status_payload(agent)
+            config = AGENT_REGISTRY.get(agent.region_id, {})
+            payload["tier"] = getattr(agent, "tier", config.get("tier", 1))
+            payload["specialization"] = getattr(agent, "specialization", config.get("specialization", "regional"))
+            payload["parent_region"] = getattr(agent, "parent_region", config.get("parent_region"))
+            results.append(payload)
+        return results
 
     def get_agent(self, region_id: str) -> GeoAgent:
         """Resolve an agent by region id or raise a 404-style error."""
@@ -215,37 +245,43 @@ class AgentManager:
         }
 
     def _instantiate_agents(self) -> None:
-        self.agents = {
-            SEAsiaGeoAgent.REGION_ID: SEAsiaGeoAgent(
-                llm_client=self.llm_client, zep_client=self.zep_client
-            ),
-            EuropeGeoAgent.REGION_ID: EuropeGeoAgent(
-                llm_client=self.llm_client, zep_client=self.zep_client
-            ),
-            GulfSuezGeoAgent.REGION_ID: GulfSuezGeoAgent(
-                llm_client=self.llm_client, zep_client=self.zep_client
-            ),
-            NorthAmericaGeoAgent.REGION_ID: NorthAmericaGeoAgent(
-                llm_client=self.llm_client,
-                zep_client=self.zep_client,
-            ),
-            ChinaEastAsiaGeoAgent.REGION_ID: ChinaEastAsiaGeoAgent(
-                llm_client=self.llm_client,
-                zep_client=self.zep_client,
-            ),
-            SouthAsiaGeoAgent.REGION_ID: SouthAsiaGeoAgent(
-                llm_client=self.llm_client,
-                zep_client=self.zep_client,
-            ),
-            LatinAmericaGeoAgent.REGION_ID: LatinAmericaGeoAgent(
-                llm_client=self.llm_client,
-                zep_client=self.zep_client,
-            ),
-            AfricaGeoAgent.REGION_ID: AfricaGeoAgent(
-                llm_client=self.llm_client,
-                zep_client=self.zep_client,
-            ),
+        from app.agents.agent_registry import AGENT_REGISTRY
+        from app.agents.parameterized_agent import ParameterizedGeoAgent
+
+        self.agents = {}
+        tier1_classes = {
+            SEAsiaGeoAgent.REGION_ID: SEAsiaGeoAgent,
+            EuropeGeoAgent.REGION_ID: EuropeGeoAgent,
+            GulfSuezGeoAgent.REGION_ID: GulfSuezGeoAgent,
+            NorthAmericaGeoAgent.REGION_ID: NorthAmericaGeoAgent,
+            ChinaEastAsiaGeoAgent.REGION_ID: ChinaEastAsiaGeoAgent,
+            SouthAsiaGeoAgent.REGION_ID: SouthAsiaGeoAgent,
+            LatinAmericaGeoAgent.REGION_ID: LatinAmericaGeoAgent,
+            AfricaGeoAgent.REGION_ID: AfricaGeoAgent,
         }
+
+        for region_id, config in AGENT_REGISTRY.items():
+            if region_id in tier1_classes:
+                self.agents[region_id] = tier1_classes[region_id](
+                    llm_client=self.llm_client, zep_client=self.zep_client
+                )
+            else:
+                self.agents[region_id] = ParameterizedGeoAgent(
+                    config=config,
+                    llm_client=self.llm_client,
+                    zep_client=self.zep_client,
+                )
+
+        for region_id, config in AGENT_REGISTRY.items():
+            neighbors = _compute_proximity_neighbors(
+                region_id, config, AGENT_REGISTRY
+            )
+            if region_id in NEIGHBOR_MAP:
+                manual_neighbors = NEIGHBOR_MAP[region_id]
+                combined = list(dict.fromkeys(manual_neighbors + neighbors))
+                self.agents[region_id].set_neighbors(combined[:8])
+            else:
+                self.agents[region_id].set_neighbors(neighbors[:6])
 
     @staticmethod
     def _status_payload(agent: GeoAgent) -> dict[str, Any]:

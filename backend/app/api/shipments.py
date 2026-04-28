@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import require_operator
 from app.db.models import ShipmentRecord
 from app.db.session import get_db_session
 from app.orchestrator.orchestrator import swarm_orchestrator
@@ -258,6 +259,7 @@ def _compute_shipment_risk(route: list[str]) -> dict[str, Any]:
 async def create_shipment(
     payload: ShipmentCreate,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> ShipmentEnvelope:
     """Register a new shipment with route and carrier information."""
     existing = await session.execute(
@@ -299,6 +301,7 @@ async def create_shipment(
 async def bulk_import_shipments(
     file: UploadFile = File(..., description="CSV file with shipment data"),
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> BulkImportResponse:
     """
     Import shipments in bulk from a CSV file.

@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useAgentStore } from '@/stores/agent'
@@ -48,26 +30,19 @@ const regions = computed(() => {
   return Array.from(regionSet)
 })
 
-const severityColors = {
-  LOW: 'var(--color-low)',
-  MEDIUM: 'var(--color-medium)',
-  HIGH: 'var(--color-high)',
-  CRITICAL: 'var(--color-critical)'
-}
-
-function getSeverityColor(severity) {
-  return severityColors[severity?.toUpperCase()] || severityColors.LOW
+function getSeverityClass(severity) {
+  return `badge--${(severity || 'low').toLowerCase()}`
 }
 
 function getActionIcon(actionType) {
   const icons = {
-    ALERT: '⚠️',
-    REROUTE: '🔀',
-    ESCALATE: '📈',
-    RESOLVE: '✓',
-    NOTIFY: '📧'
+    ALERT: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+    REROUTE: 'M8 7h12m0 0l-4-4m4 4l-4 4M9 17H7a2 2 0 00-2 2v1a2 2 0 002 2h10a2 2 0 002-2v-1a2 2 0 00-2-2h-2M9 17V9m0 8h.01',
+    ESCALATE: 'M13 7h8m0 0v-8m0 8c-4.418 0-8-1.79-8-4s3.582-4 8-4 8 1.79 8 4-3.582 4-8 4z',
+    RESOLVE: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    NOTIFY: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
   }
-  return icons[actionType] || '📋'
+  return icons[actionType] || 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'
 }
 
 function formatTimestamp(timestamp) {
@@ -77,7 +52,7 @@ function formatTimestamp(timestamp) {
   const minutes = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  
+
   if (minutes < 1) return 'Just now'
   if (minutes < 60) return `${minutes}m ago`
   if (hours < 24) return `${hours}h ago`
@@ -136,7 +111,7 @@ onUnmounted(() => {
 
 <template>
   <div class="event-feed" :style="{ maxHeight }">
-    <div class="feed-header">
+    <div class="feed-header glass">
       <h2>Event Feed</h2>
       <div class="feed-filters">
         <select v-model="filterRegion" class="filter-select">
@@ -165,38 +140,37 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="filteredEvents.length === 0" class="empty-state">
-      <p>No events match your filters</p>
+      <p class="empty-state__text">No events match your filters</p>
     </div>
 
     <div v-else class="feed-list">
-      <div 
-        v-for="event in filteredEvents" 
-        :key="event.id" 
+      <div
+        v-for="event in filteredEvents"
+        :key="event.id"
         class="feed-item"
-        :class="'severity-' + (event.severity || 'low').toLowerCase()"
+        :class="['risk-' + (event.severity || 'low').toLowerCase()]"
       >
         <div class="feed-item__icon">
-          {{ getActionIcon(event.action_type) }}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path :d="getActionIcon(event.action_type)" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
         <div class="feed-item__content">
           <div class="feed-item__header">
             <span class="feed-item__region">{{ event.region_id }}</span>
-            <span 
-              class="feed-item__severity"
-              :style="{ backgroundColor: getSeverityColor(event.severity) }"
-            >
+            <span :class="['badge', getSeverityClass(event.severity)]">
               {{ event.severity }}
             </span>
           </div>
           <p class="feed-item__summary">{{ event.summary }}</p>
           <div class="feed-item__meta">
-            <span class="feed-item__time">{{ formatTimestamp(event.timestamp) }}</span>
-            <span v-if="event.confidence" class="feed-item__confidence">
+            <span class="feed-item__time text-mono">{{ formatTimestamp(event.timestamp) }}</span>
+            <span v-if="event.confidence" class="feed-item__confidence text-mono">
               {{ (event.confidence * 100).toFixed(0) }}% confidence
             </span>
           </div>
         </div>
-        <div class="feed-item__indicator" :style="{ backgroundColor: getSeverityColor(event.severity) }"></div>
+        <div class="feed-item__indicator"></div>
       </div>
     </div>
   </div>
@@ -207,15 +181,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
 .feed-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-surface);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -223,6 +199,8 @@ onUnmounted(() => {
 
 .feed-header h2 {
   margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
 }
 
 .feed-filters {
@@ -234,9 +212,15 @@ onUnmounted(() => {
   padding: var(--spacing-1) var(--spacing-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background-color: var(--color-bg);
+  background-color: var(--color-bg-secondary);
   color: var(--color-text);
   font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
 }
 
 .feed-list {
@@ -248,14 +232,15 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-3);
-  padding: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  padding-left: calc(var(--spacing-4) + 3px);
   border-bottom: 1px solid var(--color-border);
   position: relative;
   transition: background-color var(--transition-fast);
 }
 
 .feed-item:hover {
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-tertiary);
 }
 
 .feed-item:last-child {
@@ -269,8 +254,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-tertiary);
   flex-shrink: 0;
+  color: var(--color-text-secondary);
 }
 
 .feed-item__content {
@@ -290,14 +276,6 @@ onUnmounted(() => {
   font-size: var(--text-sm);
 }
 
-.feed-item__severity {
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: white;
-}
-
 .feed-item__summary {
   margin: 0;
   font-size: var(--text-sm);
@@ -310,7 +288,7 @@ onUnmounted(() => {
   gap: var(--spacing-3);
   margin-top: var(--spacing-1);
   font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }
 
 .feed-item__indicator {
@@ -321,8 +299,8 @@ onUnmounted(() => {
   width: 3px;
 }
 
-.severity-low .feed-item__indicator { background-color: var(--color-low); }
-.severity-medium .feed-item__indicator { background-color: var(--color-medium); }
-.severity-high .feed-item__indicator { background-color: var(--color-high); }
-.severity-critical .feed-item__indicator { background-color: var(--color-critical); }
+.feed-item.risk-low .feed-item__indicator { background-color: var(--color-low); }
+.feed-item.risk-medium .feed-item__indicator { background-color: var(--color-medium); }
+.feed-item.risk-high .feed-item__indicator { background-color: var(--color-high); }
+.feed-item.risk-critical .feed-item__indicator { background-color: var(--color-critical); }
 </style>

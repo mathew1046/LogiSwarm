@@ -14,12 +14,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import require_operator
 from app.api.schemas.projects import Envelope, EnvelopeMeta, ProjectCreateRequest, ProjectResponse
 from app.db.models import Project
 from app.db.session import get_db_session
@@ -31,7 +33,9 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 async def create_project(
     payload: ProjectCreateRequest,
     session: AsyncSession = Depends(get_db_session),
+    _operator: Any = Depends(require_operator),
 ) -> Envelope:
+    """Create a new monitoring project."""
     project = Project(name=payload.name, status=payload.status, config=payload.config)
     session.add(project)
     await session.commit()

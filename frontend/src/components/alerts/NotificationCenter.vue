@@ -1,21 +1,3 @@
-<!--
-LogiSwarm - Geo-Aware Swarm Intelligence for Supply Chains
-Copyright (C) 2025 LogiSwarm Contributors
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
--->
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAlertStore } from '@/stores/alert'
@@ -35,14 +17,8 @@ const expandedAlert = ref(null)
 const unreadCount = computed(() => alertStore.unreadCount)
 const alerts = computed(() => alertStore.alerts)
 
-function getSeverityIcon(severity) {
-  const icons = {
-    CRITICAL: '🔴',
-    HIGH: '🟠',
-    MEDIUM: '🟡',
-    LOW: '🟢'
-  }
-  return icons[severity] || '⚪'
+function getSeverityClass(severity) {
+  return `badge--${(severity || 'low').toLowerCase()}`
 }
 
 function formatTime(timestamp) {
@@ -80,41 +56,49 @@ function markAllRead() {
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="notification-overlay" @click="emit('close')">
-      <div class="notification-panel" @click.stop>
+      <div class="notification-panel glass--elevated" @click.stop>
         <div class="notification-header">
           <h3>Notifications</h3>
           <div class="notification-actions">
             <button class="btn btn--sm btn--secondary" @click="markAllRead" :disabled="unreadCount === 0">
               Mark all read
             </button>
-            <button class="close-btn" @click="emit('close')">×</button>
+            <button class="close-btn" @click="emit('close')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
 
         <div class="notification-list">
           <div v-if="alerts.length === 0" class="empty-state">
-            <p>No notifications</p>
+            <p class="empty-state__text">No notifications</p>
           </div>
 
-          <div 
-            v-for="alert in alerts.slice(0, 50)" 
+          <div
+            v-for="alert in alerts.slice(0, 50)"
             :key="alert.id"
             :class="['notification-item', { unread: !alert.read, expanded: expandedAlert === alert.id }]"
             @click="expandedAlert === alert.id ? expandedAlert = null : expandedAlert = alert.id"
           >
             <div class="notification-item__header">
-              <span class="notification-icon">{{ getSeverityIcon(alert.severity) }}</span>
+              <div class="notification-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+              </div>
               <div class="notification-item__meta">
                 <span class="notification-region">{{ alert.region_id }}</span>
-                <span class="notification-time">{{ formatTime(alert.timestamp) }}</span>
+                <span class="notification-time text-mono">{{ formatTime(alert.timestamp) }}</span>
               </div>
-              <span :class="['severity-badge', 'severity-' + (alert.severity || 'low').toLowerCase()]">
+              <span :class="['badge', getSeverityClass(alert.severity)]">
                 {{ alert.severity }}
               </span>
             </div>
-            
+
             <p class="notification-summary">{{ alert.summary }}</p>
-            
+
             <div v-if="expandedAlert === alert.id" class="notification-detail">
               <p v-if="alert.details">{{ alert.details }}</p>
               <div class="notification-buttons">
@@ -124,7 +108,7 @@ function markAllRead() {
                 <button class="btn btn--sm btn--secondary" @click.stop="handleAction(alert.id, 'dismiss')">
                   Dismiss
                 </button>
-                <button class="btn btn--sm btn--secondary" @click.stop="dismissAlert(alert.id)">
+                <button class="btn btn--sm btn--ghost" @click.stop="dismissAlert(alert.id)">
                   Clear
                 </button>
               </div>
@@ -143,7 +127,7 @@ function markAllRead() {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.6);
   z-index: 1000;
   display: flex;
   justify-content: flex-end;
@@ -153,8 +137,6 @@ function markAllRead() {
   width: 400px;
   max-width: 100%;
   height: 100%;
-  background-color: var(--color-surface);
-  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
 }
@@ -169,6 +151,8 @@ function markAllRead() {
 
 .notification-header h3 {
   margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
 }
 
 .notification-actions {
@@ -184,13 +168,15 @@ function markAllRead() {
   align-items: center;
   justify-content: center;
   background: none;
-  border: none;
-  font-size: var(--text-xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
 }
 
 .close-btn:hover {
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text);
 }
 
@@ -200,18 +186,19 @@ function markAllRead() {
 }
 
 .notification-item {
-  padding: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: 1px solid var(--color-border);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 
 .notification-item:hover {
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-tertiary);
 }
 
 .notification-item.unread {
   background-color: rgba(59, 130, 246, 0.05);
+  border-left: 2px solid var(--color-primary);
 }
 
 .notification-item__header {
@@ -222,7 +209,14 @@ function markAllRead() {
 }
 
 .notification-icon {
-  font-size: var(--text-lg);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-warning);
 }
 
 .notification-item__meta {
@@ -238,36 +232,37 @@ function markAllRead() {
 
 .notification-time {
   font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }
-
-.severity-badge {
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-
-.severity-low { background-color: var(--color-low); color: white; }
-.severity-medium { background-color: var(--color-medium); color: white; }
-.severity-high { background-color: var(--color-high); color: white; }
-.severity-critical { background-color: var(--color-critical); color: white; }
 
 .notification-summary {
   font-size: var(--text-sm);
   margin: 0;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
 }
 
 .notification-detail {
   margin-top: var(--spacing-3);
   padding-top: var(--spacing-3);
   border-top: 1px solid var(--color-border);
+  animation: fadeIn 200ms ease;
 }
 
 .notification-buttons {
   display: flex;
   gap: var(--spacing-2);
   margin-top: var(--spacing-2);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
