@@ -192,8 +192,8 @@ async def register(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    user_count = await session.execute(select(User))
-    is_first_user = user_count.scalar_one_or_none() is None
+    user_count = await session.execute(select(func.count()).select_from(User))
+    is_first_user = user_count.scalar() == 0
 
     role = "admin" if is_first_user else "viewer"
 
