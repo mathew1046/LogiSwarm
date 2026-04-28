@@ -72,6 +72,12 @@ const routes = [
     meta: { title: 'Simulation' }
   },
   {
+    path: '/agents',
+    name: 'agents',
+    component: () => import('../views/AgentMapView.vue'),
+    meta: { title: 'Agent Map' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../views/NotFoundView.vue'),

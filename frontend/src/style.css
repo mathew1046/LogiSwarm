@@ -53,6 +53,16 @@
   --color-high-glow: rgba(249, 115, 22, 0.4);
   --color-critical-glow: rgba(239, 68, 68, 0.5);
 
+  /* Category Colors */
+  --color-category-canal: #3b82f6;
+  --color-category-port: #a855f7;
+  --color-category-weather: #06b6d4;
+  --color-category-geopolitical: #f97316;
+  --color-category-cyber: #ef4444;
+  --color-category-labor: #eab308;
+  --color-category-pandemic: #22c55e;
+  --color-category-infrastructure: #9ca3af;
+
   /* Semantic */
   --color-success: #22c55e;
   --color-warning: #eab308;

@@ -51,6 +51,85 @@ export const useAgentStore = defineStore('agent', () => {
   const degradedAgents = computed(() =>
     agents.value.filter(a => a.degradation_status?.is_degraded)
   )
+
+  // New computed properties for enriched topology metrics
+  const agentsWithHighRisk = computed(() =>
+    agents.value.filter(a => {
+      const riskSignals = a.risk_signals
+      if (!riskSignals) return false
+      const signals = Array.isArray(riskSignals) ? riskSignals : [riskSignals]
+      return signals.some(s => 
+        s?.level === 'HIGH' || 
+        s?.level === 'CRITICAL' ||
+        s?.severity === 'HIGH' ||
+        s?.severity === 'CRITICAL'
+      )
+    })
+  )
+
+  const agentsWithPortCongestion = computed(() =>
+    agents.value.filter(a => {
+      const portMetrics = a.port_metrics
+      if (!portMetrics) return false
+      const congestionLevel = portMetrics?.congestion_level || portMetrics?.congestion || portMetrics?.utilization
+      return congestionLevel === 'HIGH' || congestionLevel === 'CRITICAL' || congestionLevel > 80
+    })
+  )
+
+  const agentsWithWeatherImpact = computed(() =>
+    agents.value.filter(a => {
+      const weather = a.weather_impact
+      if (!weather) return false
+      return weather?.severity === 'HIGH' || 
+             weather?.severity === 'CRITICAL' ||
+             weather?.impact_level === 'HIGH' ||
+             weather?.impact_level === 'SEVERE'
+    })
+  )
+
+  const agentsWithInventoryIssues = computed(() =>
+    agents.value.filter(a => {
+      const inventory = a.inventory_status
+      if (!inventory) return false
+      return inventory?.status === 'CRITICAL' ||
+             inventory?.status === 'DEPLETED' ||
+             inventory?.stock_level === 'LOW' ||
+             inventory?.stock_level < 20
+    })
+  )
+
+  const agentsByTier = computed(() => {
+    const result = { 1: [], 2: [], 3: [], unknown: [] }
+    for (const agent of agents.value) {
+      const tier = agent.tier ?? 'unknown'
+      if (result[tier]) {
+        result[tier].push(agent)
+      } else {
+        result.unknown.push(agent)
+      }
+    }
+    return result
+  })
+
+  const agentsWithFinancialImpact = computed(() =>
+    agents.value.filter(a => {
+      const financial = a.financial_impact
+      if (!financial) return false
+      return financial?.impact === 'HIGH' ||
+             financial?.impact === 'CRITICAL' ||
+             financial?.estimated_loss > 1000000
+    })
+  )
+
+  const agentsWithSustainabilityIssues = computed(() =>
+    agents.value.filter(a => {
+      const sustainability = a.sustainability_metrics
+      if (!sustainability) return false
+      return sustainability?.emissions_level === 'HIGH' ||
+             sustainability?.compliance_status === 'NON_COMPLIANT' ||
+             sustainability?.carbon_footprint > 10000
+    })
+  )
   const filteredAgents = computed(() => {
     let filtered = agents.value
     if (selectedTiers.value.length > 0) {
@@ -276,6 +355,13 @@ export const useAgentStore = defineStore('agent', () => {
     searchQuery,
     selectedTiers,
     pagination,
+    agentsWithHighRisk,
+    agentsWithPortCongestion,
+    agentsWithWeatherImpact,
+    agentsWithInventoryIssues,
+    agentsByTier,
+    agentsWithFinancialImpact,
+    agentsWithSustainabilityIssues,
     fetchAgents,
     fetchFilteredAgents,
     fetchAgentStats,
